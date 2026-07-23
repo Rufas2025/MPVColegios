@@ -1,84 +1,28 @@
 -- =============================================================================
 -- 007_function_permissions.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV)
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
 --
--- PostgreSQL concede EXECUTE a PUBLIC por padrão em funções novas — sem a
--- revogação explícita abaixo, qualquer role com acesso ao banco poderia
--- chamar as 9 funções. GRANT EXECUTE é concedido só à role de aplicação
--- (n8n_rufino_linkedin_dev), nunca a PUBLIC, nunca a outra role.
+-- ESTE ARQUIVO NÃO CONTÉM SQL EXECUTÁVEL. Ele existe só para preservar a
+-- numeração e a documentação da migration — o conteúdo que antes vivia
+-- aqui (REVOKE EXECUTE FROM PUBLIC + GRANT EXECUTE das 9 funções) foi
+-- MOVIDO para dentro de 006_functions.sql (fix v1.4.1, item 5:
+-- atomicidade).
+--
+-- Motivo da mudança: na v1.4.0, 006 e 007 eram transações separadas.
+-- Postgres concede EXECUTE a PUBLIC por padrão em toda função nova — entre
+-- o COMMIT de 006 (funções criadas, ainda com o grant padrão a PUBLIC
+-- valendo) e a aplicação de 007 (que revogava esse grant), existia uma
+-- janela real em que qualquer role com acesso ao banco podia chamar as 9
+-- funções recém-criadas. A partir da v1.4.1, a criação das funções e o
+-- travamento de permissões (REVOKE FROM PUBLIC + GRANT só para
+-- n8n_rufino_linkedin_dev, exceto transition_connection_status, que fica
+-- só com o REVOKE — ver fix v1.4.1, item 4) acontecem dentro do mesmo
+-- BEGIN...COMMIT de 006_functions.sql. Não há mais nenhuma janela entre a
+-- criação de uma função e o fechamento de suas permissões.
+--
+-- Se este arquivo aparecer numa aplicação real da migration, ele não faz
+-- nada (nenhum comando SQL abaixo) — isso é intencional, não um passo
+-- esquecido. Mantido na sequência 001–008 só para não renumerar os demais
+-- arquivos e para quem revisar a migration entender por que o passo "7"
+-- está vazio.
 -- =============================================================================
-
-REVOKE EXECUTE ON FUNCTION rufino_linkedin.register_connection(
-    text, text, text, text, text, text, text, text, date, text, jsonb, text, text, numeric, boolean, jsonb, text, text, text
-) FROM PUBLIC;
-
-REVOKE EXECUTE ON FUNCTION rufino_linkedin.transition_connection_status(
-    uuid, text, text, text, text, text, text
-) FROM PUBLIC;
-
-REVOKE EXECUTE ON FUNCTION rufino_linkedin.present_message_for_delivery(
-    uuid, uuid, text, text, text
-) FROM PUBLIC;
-
-REVOKE EXECUTE ON FUNCTION rufino_linkedin.claim_due_connections(
-    integer, text, text
-) FROM PUBLIC;
-
-REVOKE EXECUTE ON FUNCTION rufino_linkedin.approve_message(
-    uuid, uuid, text, text, text, text, text, text, text
-) FROM PUBLIC;
-
-REVOKE EXECUTE ON FUNCTION rufino_linkedin.save_message_edit(
-    text, text, text, text, text
-) FROM PUBLIC;
-
-REVOKE EXECUTE ON FUNCTION rufino_linkedin.mark_message_sent(
-    uuid, uuid, text, text, text, text, text, text
-) FROM PUBLIC;
-
-REVOKE EXECUTE ON FUNCTION rufino_linkedin.claim_due_followups(
-    integer
-) FROM PUBLIC;
-
-REVOKE EXECUTE ON FUNCTION rufino_linkedin.record_workflow_error(
-    uuid, text, text, text, jsonb, text, text, integer, text
-) FROM PUBLIC;
-
--- -----------------------------------------------------------------------------
--- GRANT EXECUTE apenas para a role de aplicação do n8n (DEV).
--- -----------------------------------------------------------------------------
-GRANT EXECUTE ON FUNCTION rufino_linkedin.register_connection(
-    text, text, text, text, text, text, text, text, date, text, jsonb, text, text, numeric, boolean, jsonb, text, text, text
-) TO n8n_rufino_linkedin_dev;
-
-GRANT EXECUTE ON FUNCTION rufino_linkedin.transition_connection_status(
-    uuid, text, text, text, text, text, text
-) TO n8n_rufino_linkedin_dev;
-
-GRANT EXECUTE ON FUNCTION rufino_linkedin.present_message_for_delivery(
-    uuid, uuid, text, text, text
-) TO n8n_rufino_linkedin_dev;
-
-GRANT EXECUTE ON FUNCTION rufino_linkedin.claim_due_connections(
-    integer, text, text
-) TO n8n_rufino_linkedin_dev;
-
-GRANT EXECUTE ON FUNCTION rufino_linkedin.approve_message(
-    uuid, uuid, text, text, text, text, text, text, text
-) TO n8n_rufino_linkedin_dev;
-
-GRANT EXECUTE ON FUNCTION rufino_linkedin.save_message_edit(
-    text, text, text, text, text
-) TO n8n_rufino_linkedin_dev;
-
-GRANT EXECUTE ON FUNCTION rufino_linkedin.mark_message_sent(
-    uuid, uuid, text, text, text, text, text, text
-) TO n8n_rufino_linkedin_dev;
-
-GRANT EXECUTE ON FUNCTION rufino_linkedin.claim_due_followups(
-    integer
-) TO n8n_rufino_linkedin_dev;
-
-GRANT EXECUTE ON FUNCTION rufino_linkedin.record_workflow_error(
-    uuid, text, text, text, jsonb, text, text, integer, text
-) TO n8n_rufino_linkedin_dev;

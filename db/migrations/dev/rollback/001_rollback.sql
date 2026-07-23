@@ -1,8 +1,10 @@
 -- =============================================================================
 -- rollback/001_rollback.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV)
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
 --
--- Rollback irmão de 001–007. Ordem segura, inversa à ordem de criação:
+-- Rollback irmão de 001–007 (007 é um stub documental desde a v1.4.1 — seu
+-- conteúdo de permissões vive dentro de 006, ver 007_function_permissions.sql).
+-- Ordem segura, inversa à ordem de criação:
 --   1. Funções (as 9)               — sem risco de dado.
 --   2. Grants (EXECUTE/SELECT/USAGE) e policies de RLS.
 --   3. Tabelas dependentes de connections (nesta ordem entre si é livre,
@@ -27,7 +29,7 @@
 -- 1) Funções — DROP FUNCTION, sem risco de dado.
 -- -----------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS rufino_linkedin.register_connection(
-    text, text, text, text, text, text, text, text, date, text, jsonb, text, text, numeric, boolean, jsonb, text, text, text
+    text, text, text, text, text, text, text, text, date, text, jsonb, text, text, numeric, boolean, jsonb, text, text, text, text
 );
 DROP FUNCTION IF EXISTS rufino_linkedin.transition_connection_status(
     uuid, text, text, text, text, text, text
@@ -82,6 +84,14 @@ DROP POLICY IF EXISTS connection_status_history_select_app ON rufino_linkedin.co
 
 REVOKE USAGE ON SCHEMA rufino_linkedin FROM n8n_rufino_linkedin_dev;
 REVOKE USAGE ON SCHEMA rufino_linkedin FROM n8n_rufino_linkedin_owner_dev;
+
+-- Acesso a pgcrypto concedido em 002_roles_and_schema.sql (fix v1.4.1, item
+-- 2) — revogado aqui na mesma role. Nunca revoga de PUBLIC nem de nenhuma
+-- outra role: o schema extensions e a extensão pgcrypto em si podem ser
+-- usados por outras coisas no banco, fora desta jornada.
+REVOKE EXECUTE ON FUNCTION extensions.gen_random_bytes(integer) FROM n8n_rufino_linkedin_owner_dev;
+REVOKE EXECUTE ON FUNCTION extensions.digest(text, text) FROM n8n_rufino_linkedin_owner_dev;
+REVOKE USAGE ON SCHEMA extensions FROM n8n_rufino_linkedin_owner_dev;
 
 -- -----------------------------------------------------------------------------
 -- 3) Tabelas dependentes de connections — CASCADE cobre FKs; ordem entre si

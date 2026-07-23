@@ -12,7 +12,13 @@
 -- têm created_at/updated_at. Nenhuma tabela guarda segredo, cookie, token de
 -- sessão do LinkedIn ou valor bruto de action_token/edit_token — apenas
 -- hashes SHA-256 (ver 006_functions.sql).
+--
+-- ATOMICIDADE (fix v1.4.1, item 5): todo o arquivo roda dentro de uma única
+-- transação — se qualquer CREATE TABLE falhar, nenhuma das 8 fica criada
+-- pela metade.
 -- =============================================================================
+
+BEGIN;
 
 -- -----------------------------------------------------------------------------
 -- connections
@@ -186,3 +192,5 @@ ALTER TABLE rufino_linkedin.connection_status_history OWNER TO n8n_rufino_linked
 
 COMMENT ON TABLE rufino_linkedin.connection_status_history IS
     'Append-only — sem updated_at de propósito. Escrita exclusiva por transition_connection_status. Nenhuma exclusão de registro de auditoria no caminho operacional.';
+
+COMMIT;

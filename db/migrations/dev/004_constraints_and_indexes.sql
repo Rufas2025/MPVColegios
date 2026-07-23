@@ -4,7 +4,13 @@
 --
 -- Foreign keys, UNIQUE, CHECK e índices das 8 tabelas criadas em
 -- 003_tables.sql. Nenhuma tabela fica "solta" sem estas garantias.
+--
+-- ATOMICIDADE (fix v1.4.1, item 5): todo o arquivo roda dentro de uma única
+-- transação — uma FK ou índice que falhar não deixa metade das constraints
+-- aplicadas.
 -- =============================================================================
+
+BEGIN;
 
 -- -----------------------------------------------------------------------------
 -- connections
@@ -111,3 +117,5 @@ ALTER TABLE rufino_linkedin.connection_status_history
 
 CREATE INDEX connection_status_history_connection_id_created_at_idx
     ON rufino_linkedin.connection_status_history (connection_id, created_at);
+
+COMMIT;

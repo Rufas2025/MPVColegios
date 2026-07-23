@@ -1,19 +1,43 @@
 -- =============================================================================
 -- 005_rls_and_grants.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV)
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
 --
 -- Isolamento primário desta arquitetura: (1) schema rufino_linkedin privado,
 -- sem USAGE para PUBLIC; (2) grants mínimos — a role de aplicação só recebe
--- EXECUTE (nas funções, ver 007) e SELECT (nas tabelas, aqui) — nunca
--- INSERT/UPDATE/DELETE direto. RLS é uma terceira camada de defesa (útil
--- contra erro de configuração futuro), não o mecanismo primário.
+-- EXECUTE (nas 8 funções voltadas ao n8n, ver 006_functions.sql) e SELECT
+-- (nas tabelas, aqui) — nunca INSERT/UPDATE/DELETE direto. RLS é uma
+-- terceira camada de defesa (útil contra erro de configuração futuro), não
+-- o mecanismo primário.
 --
 -- Não existe aqui nenhum conceito de "service_role"/Data API/Supavisor —
 -- este é PostgreSQL self-hosted no EasyPanel. O equivalente de risco a
 -- vigiar é o mesmo de qualquer Postgres: nunca usar a role "postgres"
 -- (superuser do serviço linkedin-db) como credencial do n8n — isso é regra
 -- operacional (ver MANUAL-STEPS.md), não algo que esta migration resolve.
+--
+-- CORREÇÃO v1.4.1 (item 1 do patch corretivo): a v1.4.0 habilitava **e
+-- forçava** RLS (`FORCE ROW LEVEL SECURITY`) nas 8 tabelas. Isso era um bug
+-- funcional, não só um exagero de cautela: `FORCE ROW LEVEL SECURITY` faz a
+-- política valer até para o dono da tabela — e o dono é
+-- `n8n_rufino_linkedin_owner_dev`, a mesma role que executa o corpo de
+-- TODAS as 9 funções `SECURITY DEFINER` (INSERT/UPDATE feitos por
+-- `register_connection`, `transition_connection_status` etc. rodam como
+-- essa role). Como só existem policies de `SELECT` para a role de
+-- aplicação — nenhuma policy cobre `INSERT`/`UPDATE` para a owner — forçar
+-- RLS faria essas escritas serem negadas pela própria política, quebrando
+-- todas as 9 funções assim que qualquer instância real tentasse gravar.
+-- `ENABLE ROW LEVEL SECURITY` (sem `FORCE`) já dá a defesa adicional
+-- pretendida — RLS continua avaliado para qualquer role que não seja a
+-- dona da tabela — sem quebrar as funções. A owner ignorar RLS aqui não é
+-- uma lacuna de segurança: ela é `NOLOGIN` (ninguém conecta como ela
+-- diretamente) e só grava através do corpo das 9 funções, cujas próprias
+-- regras de negócio (validação de transição, tokens, dedupe) são a
+-- proteção real dessas escritas — RLS nunca foi pensada para restringir
+-- *o que a função em si decide gravar*, só para restringir sessões
+-- externas que tentassem ler/escrever a tabela fora de uma função.
 -- =============================================================================
+
+BEGIN;
 
 -- Revoga tudo de PUBLIC no schema e nas tabelas — ponto de partida explícito,
 -- nunca herdar o default do Postgres de conceder USAGE a PUBLIC no schema.
@@ -25,10 +49,11 @@ GRANT USAGE ON SCHEMA rufino_linkedin TO n8n_rufino_linkedin_owner_dev;
 GRANT USAGE ON SCHEMA rufino_linkedin TO n8n_rufino_linkedin_dev;
 
 -- -----------------------------------------------------------------------------
--- RLS habilitado + forçado nas 8 tabelas (defesa adicional, não primária).
--- FORCE ROW LEVEL SECURITY garante que a política vale mesmo para o dono da
--- tabela quando ele conectar diretamente (a role owner é NOLOGIN, então isso
--- é relevante principalmente como registro explícito de intenção).
+-- RLS habilitado (não forçado) nas 8 tabelas — defesa adicional, não
+-- primária. Sem FORCE: a role owner (dona das tabelas, NOLOGIN, só grava
+-- através das 9 funções SECURITY DEFINER) continua isenta de RLS por
+-- desenho — ver explicação no cabeçalho deste arquivo. RLS continua valendo
+-- para qualquer outra role, incluindo a de aplicação.
 -- -----------------------------------------------------------------------------
 ALTER TABLE rufino_linkedin.connections               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rufino_linkedin.analyses                   ENABLE ROW LEVEL SECURITY;
@@ -38,15 +63,6 @@ ALTER TABLE rufino_linkedin.delivery_events            ENABLE ROW LEVEL SECURITY
 ALTER TABLE rufino_linkedin.followups                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rufino_linkedin.workflow_errors            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rufino_linkedin.connection_status_history  ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE rufino_linkedin.connections               FORCE ROW LEVEL SECURITY;
-ALTER TABLE rufino_linkedin.analyses                   FORCE ROW LEVEL SECURITY;
-ALTER TABLE rufino_linkedin.message_versions           FORCE ROW LEVEL SECURITY;
-ALTER TABLE rufino_linkedin.approvals                  FORCE ROW LEVEL SECURITY;
-ALTER TABLE rufino_linkedin.delivery_events            FORCE ROW LEVEL SECURITY;
-ALTER TABLE rufino_linkedin.followups                  FORCE ROW LEVEL SECURITY;
-ALTER TABLE rufino_linkedin.workflow_errors            FORCE ROW LEVEL SECURITY;
-ALTER TABLE rufino_linkedin.connection_status_history  FORCE ROW LEVEL SECURITY;
 
 -- Policies USING (true) restritas por role — não é segmentação multi-tenant
 -- (não há multi-tenant dentro deste ambiente); existe para o caso de o
@@ -70,8 +86,8 @@ CREATE POLICY connection_status_history_select_app ON rufino_linkedin.connection
 
 -- -----------------------------------------------------------------------------
 -- Grants da role de aplicação: apenas SELECT. Nenhum INSERT/UPDATE/DELETE
--- direto em nenhuma tabela — toda escrita operacional passa pelas 9 funções
--- (ver 007_function_permissions.sql). Sem DELETE em nenhuma tabela, por
+-- direto em nenhuma tabela — toda escrita operacional passa pelas 8 funções
+-- voltadas ao n8n (ver 006_functions.sql). Sem DELETE em nenhuma tabela, por
 -- nenhuma role, no caminho operacional normal.
 -- -----------------------------------------------------------------------------
 GRANT SELECT ON
@@ -84,3 +100,5 @@ GRANT SELECT ON
     rufino_linkedin.workflow_errors,
     rufino_linkedin.connection_status_history
 TO n8n_rufino_linkedin_dev;
+
+COMMIT;

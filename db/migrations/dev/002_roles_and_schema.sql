@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 002_roles_and_schema.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV)
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
 --
 -- Cria o schema privado rufino_linkedin e as duas roles dedicadas do
 -- ambiente DEV:
@@ -14,7 +14,13 @@
 -- fora do controle de versão, um comando equivalente a:
 --     ALTER ROLE n8n_rufino_linkedin_dev PASSWORD '<senha forte gerada fora deste repositório>';
 -- Ver MANUAL-STEPS.md para o procedimento completo.
+--
+-- ATOMICIDADE (fix v1.4.1, item 5): todo o arquivo roda dentro de uma única
+-- transação — se qualquer instrução falhar, nada deste arquivo fica
+-- meio-aplicado.
 -- =============================================================================
+
+BEGIN;
 
 -- Schema operacional privado — nunca "public".
 CREATE SCHEMA IF NOT EXISTS rufino_linkedin;
@@ -48,9 +54,12 @@ COMMENT ON ROLE n8n_rufino_linkedin_owner_dev IS
 -- ---------------------------------------------------------------------------
 -- Role de aplicação: credencial real que o n8n usa para conectar ao
 -- serviço linkedin-db (EasyPanel, projeto rufino-linkedin-dev). Recebe
--- apenas EXECUTE nas 9 funções + SELECT nas 8 tabelas (ver
--- 005_rls_and_grants.sql e 007_function_permissions.sql) — nenhum
--- INSERT/UPDATE/DELETE direto em tabela.
+-- apenas EXECUTE nas 8 funções voltadas ao n8n + SELECT nas 8 tabelas (ver
+-- 005_rls_and_grants.sql e o bloco de permissões dentro de
+-- 006_functions.sql) — nenhum INSERT/UPDATE/DELETE direto em tabela. A nona
+-- função (`transition_connection_status`) é interna — só a role owner e as
+-- outras 8 funções (que rodam como owner) podem chamá-la; ver
+-- 006_functions.sql e `references/postgres-functions.md` da skill.
 --
 -- Explicitamente SEM: SUPERUSER, BYPASSRLS, CREATEDB, CREATEROLE,
 -- REPLICATION — regra de segurança fechada para esta migration.
@@ -79,3 +88,28 @@ COMMENT ON ROLE n8n_rufino_linkedin_dev IS
 -- Dono do schema: a role owner (objetos criados nas próximas migrations
 -- recebem OWNER TO explícito para essa role).
 ALTER SCHEMA rufino_linkedin OWNER TO n8n_rufino_linkedin_owner_dev;
+
+-- ---------------------------------------------------------------------------
+-- Acesso a pgcrypto (schema `extensions`) — fix v1.4.1, item 2.
+--
+-- As funções SECURITY DEFINER (006_functions.sql) chamam
+-- extensions.gen_random_bytes(...) e extensions.digest(...) enquanto rodam
+-- COMO a role owner (é assim que SECURITY DEFINER funciona — o corpo da
+-- função executa com os privilégios de quem é dono da função, não de quem
+-- a chama). Para essas chamadas resolverem, a role owner precisa de USAGE
+-- no schema `extensions` e EXECUTE nas duas funções específicas do
+-- pgcrypto usadas nesta jornada — conceder isso explicitamente em vez de
+-- depender de qualquer grant a PUBLIC que a instalação da extensão possa
+-- ou não ter deixado.
+--
+-- A role de aplicação (`n8n_rufino_linkedin_dev`) NUNCA recebe acesso ao
+-- schema `extensions` — ela nunca chama digest()/gen_random_bytes()
+-- diretamente, só através das funções SECURITY DEFINER, que já rodam como
+-- a owner. Dar `USAGE`/`EXECUTE` de `extensions` à role de aplicação seria
+-- um privilégio a mais que ela não usa e não deve ter.
+-- ---------------------------------------------------------------------------
+GRANT USAGE ON SCHEMA extensions TO n8n_rufino_linkedin_owner_dev;
+GRANT EXECUTE ON FUNCTION extensions.digest(text, text) TO n8n_rufino_linkedin_owner_dev;
+GRANT EXECUTE ON FUNCTION extensions.gen_random_bytes(integer) TO n8n_rufino_linkedin_owner_dev;
+
+COMMIT;

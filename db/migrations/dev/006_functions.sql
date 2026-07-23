@@ -1,17 +1,29 @@
 -- =============================================================================
 -- 006_functions.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV)
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
 --
 -- As 9 funções PostgreSQL SECURITY DEFINER canônicas:
---   1. register_connection
---   2. transition_connection_status
---   3. present_message_for_delivery
---   4. claim_due_connections
---   5. approve_message
---   6. save_message_edit
---   7. mark_message_sent
---   8. claim_due_followups
---   9. record_workflow_error
+--   1. register_connection                  (executável pela role de aplicação)
+--   2. transition_connection_status         (INTERNA — ver nota abaixo)
+--   3. present_message_for_delivery          (executável pela role de aplicação)
+--   4. claim_due_connections                 (executável pela role de aplicação)
+--   5. approve_message                       (executável pela role de aplicação)
+--   6. save_message_edit                     (executável pela role de aplicação)
+--   7. mark_message_sent                     (executável pela role de aplicação)
+--   8. claim_due_followups                   (executável pela role de aplicação)
+--   9. record_workflow_error                 (executável pela role de aplicação)
+--
+-- CORREÇÃO v1.4.1 (item 4 do patch corretivo): `transition_connection_status`
+-- passa a ser tratada como função INTERNA — a role de aplicação
+-- (`n8n_rufino_linkedin_dev`) nunca recebe `EXECUTE` nela (só `REVOKE ...
+-- FROM PUBLIC`, no bloco de permissões ao final deste arquivo). As outras 8
+-- funções continuam podendo chamá-la livremente, porque todas rodam como a
+-- mesma role owner (`SECURITY DEFINER`) — uma função chamando outra função
+-- de que ela mesma é dona nunca precisa de um GRANT EXECUTE adicional; posse
+-- já garante esse privilégio. Resultado: 8 das 9 funções são executáveis
+-- pela role de aplicação; 1 (`transition_connection_status`) só é alcançável
+-- de dentro das outras 8, ou por uma sessão administrativa que assuma a
+-- role owner (ver `MANUAL-STEPS.md`, seção "Retomada manual de ERRO").
 --
 -- Hardening aplicado a todas, sem exceção:
 --   - SECURITY DEFINER, owner n8n_rufino_linkedin_owner_dev (NOLOGIN).
@@ -22,10 +34,10 @@
 --     (rufino_linkedin.connections, extensions.digest, etc.).
 --   - extensions.digest / extensions.gen_random_bytes — pgcrypto confirmada
 --     no schema "extensions" (versão 1.3, confirmado por consulta real em
---     pg_extension no preflight desta migration).
+--     pg_extension no preflight desta migration); a role owner recebeu
+--     USAGE nesse schema e EXECUTE nessas duas funções em
+--     002_roles_and_schema.sql (fix v1.4.1, item 2).
 --   - Nenhuma delas usa SQL dinâmico (EXECUTE format(...)).
---   - REVOKE EXECUTE FROM PUBLIC e GRANT EXECUTE só para a role de aplicação
---     acontecem em 007_function_permissions.sql, não aqui.
 --   - Atômicas: cada chamada é uma única invocação de função, executada
 --     dentro da transação implícita da chamada — qualquer exceção reverte
 --     integralmente os efeitos daquela chamada (nenhuma escrita parcial).
@@ -33,7 +45,19 @@
 --     bruto existe só de passagem (retornado uma única vez ao chamador,
 --     nunca relido do banco); todo token tem expiração e é invalidado no
 --     primeiro uso válido.
+--
+-- ATOMICIDADE (fix v1.4.1, item 5): este arquivo cria as 9 funções E aplica
+-- REVOKE EXECUTE FROM PUBLIC + GRANT EXECUTE autorizado dentro da MESMA
+-- transação (BEGIN...COMMIT único). Isso fecha a janela que existia na
+-- v1.4.0, onde as funções eram criadas em 006 (com o GRANT padrão do
+-- Postgres a PUBLIC ainda valendo) e só ficavam trancadas quando 007 rodava
+-- depois, como arquivo/transação separada — entre uma aplicação e outra,
+-- qualquer role com acesso ao banco podia chamar as funções recém-criadas.
+-- Ver 007_function_permissions.sql (agora um arquivo apenas documental,
+-- sem SQL executável, para preservar a numeração da migration).
 -- =============================================================================
+
+BEGIN;
 
 -- =============================================================================
 -- 1) register_connection
@@ -56,43 +80,40 @@ CREATE FUNCTION rufino_linkedin.register_connection(
     p_sensivel          boolean,
     p_alertas           jsonb,
     p_brain_version     text,
+    p_mensagem          text,
     p_workflow_name     text DEFAULT 'WF-01',
     p_execution_id      text DEFAULT NULL
 )
 RETURNS TABLE (
-    connection_id   uuid,
-    status          text,
-    scheduled_at    timestamptz,
-    already_existed boolean
+    connection_id       uuid,
+    status               text,
+    scheduled_at         timestamptz,
+    message_version_id   uuid,
+    already_existed      boolean
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = rufino_linkedin, extensions, pg_temp
 AS $fn$
 DECLARE
-    v_connection_id   uuid;
-    v_scheduled_at    timestamptz;
-    v_existing_id     uuid;
-    v_dow             integer;
-    v_days_to_add     integer;
-    v_target_date     date;
+    v_connection_id       uuid;
+    v_scheduled_at        timestamptz;
+    v_dow                 integer;
+    v_days_to_add         integer;
+    v_target_date         date;
+    v_message_version_id  uuid;
 BEGIN
     IF p_idempotency_key IS NULL OR p_nome IS NULL OR p_primeiro_nome IS NULL
        OR p_profile_url IS NULL OR p_data_conexao IS NULL THEN
         RAISE EXCEPTION 'register_connection: parametros obrigatorios ausentes';
     END IF;
 
-    -- Idempotência: se já existir, retorna o registro existente sem gravar nada novo.
-    SELECT c.connection_id INTO v_existing_id
-      FROM rufino_linkedin.connections c
-     WHERE c.idempotency_key = p_idempotency_key;
-
-    IF FOUND THEN
-        RETURN QUERY
-        SELECT c.connection_id, c.status, c.scheduled_at, true
-          FROM rufino_linkedin.connections c
-         WHERE c.connection_id = v_existing_id;
-        RETURN;
+    -- Mensagem inicial (fix v1.4.1, item 3): sempre exigida e não-vazia —
+    -- register_connection passa a ser o único ponto de entrada de uma
+    -- conexão nova, e toda conexão precisa nascer com uma primeira versão
+    -- de mensagem para o restante da jornada (WF-02...WF-04) funcionar.
+    IF p_mensagem IS NULL OR btrim(p_mensagem) = '' THEN
+        RAISE EXCEPTION 'register_connection: p_mensagem obrigatoria (nao pode ser nula ou vazia)';
     END IF;
 
     -- D+1: próximo dia útil às 09:00 America/Sao_Paulo (sem calendário de
@@ -106,24 +127,64 @@ BEGIN
     v_target_date := p_data_conexao + INTERVAL '1 day' + (v_days_to_add || ' days')::interval;
     v_scheduled_at := (v_target_date::text || ' 09:00:00')::timestamp AT TIME ZONE 'America/Sao_Paulo';
 
-    v_connection_id := gen_random_uuid();
-
-    -- Transacional: connections + analyses gravadas juntas; se qualquer uma
-    -- falhar, a chamada inteira reverte (nenhuma conexão presa sem análise).
+    -- Idempotência concorrente (fix v1.4.1, item 6): INSERT ... ON CONFLICT
+    -- DO NOTHING substitui o antigo padrão "SELECT para checar, depois
+    -- INSERT" — que tinha uma janela de corrida entre duas chamadas
+    -- concorrentes com a mesma idempotency_key (ambas passariam pelo SELECT
+    -- sem encontrar nada, e uma das duas levaria um erro de violação de
+    -- UNIQUE em vez de um retorno gracioso). Com ON CONFLICT, a checagem e a
+    -- gravação são atômicas — só uma das chamadas concorrentes de fato
+    -- insere, a outra recebe RETURNING vazio e cai no ramo "já existia"
+    -- abaixo, sem exceção nenhuma.
     INSERT INTO rufino_linkedin.connections (
         connection_id, idempotency_key, nome, primeiro_nome, cargo, instituicao, cidade,
         profile_url, conversation_url, data_conexao, scheduled_at, status, lock_version
     ) VALUES (
-        v_connection_id, p_idempotency_key, p_nome, p_primeiro_nome, p_cargo, p_instituicao, p_cidade,
+        gen_random_uuid(), p_idempotency_key, p_nome, p_primeiro_nome, p_cargo, p_instituicao, p_cidade,
         p_profile_url, p_conversation_url, p_data_conexao, v_scheduled_at, 'NOVO', 0
-    );
+    )
+    ON CONFLICT (idempotency_key) DO NOTHING
+    RETURNING rufino_linkedin.connections.connection_id INTO v_connection_id;
 
+    IF v_connection_id IS NULL THEN
+        -- Conflito: já existia uma conexão com essa idempotency_key. Não
+        -- gravar nada novo (nem analyses, nem message_versions, nem
+        -- history) — devolver o registro existente, com a message_version
+        -- vigente dele.
+        SELECT c.connection_id INTO v_connection_id
+          FROM rufino_linkedin.connections c
+         WHERE c.idempotency_key = p_idempotency_key;
+
+        SELECT mv.message_version_id INTO v_message_version_id
+          FROM rufino_linkedin.message_versions mv
+         WHERE mv.connection_id = v_connection_id
+         ORDER BY mv.version DESC
+         LIMIT 1;
+
+        RETURN QUERY
+        SELECT c.connection_id, c.status, c.scheduled_at, v_message_version_id, true
+          FROM rufino_linkedin.connections c
+         WHERE c.connection_id = v_connection_id;
+        RETURN;
+    END IF;
+
+    -- Transacional: connections + analyses + message_versions (versão 1)
+    -- gravadas juntas; se qualquer uma falhar, a chamada inteira reverte
+    -- (nenhuma conexão presa sem análise ou sem mensagem inicial).
     INSERT INTO rufino_linkedin.analyses (
         connection_id, resumo, ganchos, melhor_gancho, justificativa, confianca, sensivel, alertas, brain_version
     ) VALUES (
         v_connection_id, p_resumo, p_ganchos, p_melhor_gancho, p_justificativa, p_confianca,
         COALESCE(p_sensivel, false), COALESCE(p_alertas, '[]'::jsonb), p_brain_version
     );
+
+    -- Mensagem inicial (fix v1.4.1, item 3): version 1, source='gpt'.
+    INSERT INTO rufino_linkedin.message_versions (
+        connection_id, version, message_body, source, edited_by
+    ) VALUES (
+        v_connection_id, 1, p_mensagem, 'gpt', NULL
+    )
+    RETURNING rufino_linkedin.message_versions.message_version_id INTO v_message_version_id;
 
     -- Primeira linha de histórico (previous_status=NULL).
     INSERT INTO rufino_linkedin.connection_status_history (
@@ -150,17 +211,17 @@ BEGIN
     );
 
     RETURN QUERY
-    SELECT v_connection_id, 'AGUARDANDO_D1'::text, v_scheduled_at, false;
+    SELECT v_connection_id, 'AGUARDANDO_D1'::text, v_scheduled_at, v_message_version_id, false;
 END;
 $fn$;
 
 ALTER FUNCTION rufino_linkedin.register_connection(
-    text, text, text, text, text, text, text, text, date, text, jsonb, text, text, numeric, boolean, jsonb, text, text, text
+    text, text, text, text, text, text, text, text, date, text, jsonb, text, text, numeric, boolean, jsonb, text, text, text, text
 ) OWNER TO n8n_rufino_linkedin_owner_dev;
 
 
 -- =============================================================================
--- 2) transition_connection_status
+-- 2) transition_connection_status — INTERNA (fix v1.4.1, item 4)
 -- =============================================================================
 CREATE FUNCTION rufino_linkedin.transition_connection_status(
     p_connection_id             uuid,
@@ -216,7 +277,8 @@ BEGIN
     -- ir para ERRO (falha não tratada); a saída de ERRO é sempre confirmação
     -- manual e aceita qualquer estado de destino válido do domínio (a
     -- CHECK constraint de connections.status garante que não é um valor
-    -- arbitrário).
+    -- arbitrário). Retomada manual de ERRO é administrativa nesta versão —
+    -- ver MANUAL-STEPS.md, "Retomada manual de ERRO".
     IF p_new_status = 'ERRO' THEN
         v_valid_edge := true;
     ELSIF p_expected_current_status = 'ERRO' THEN
@@ -352,10 +414,13 @@ BEGIN
                'mensagem apresentada para entrega', p_workflow_name, p_execution_id
            ) t;
 
+    -- metadata registra explicitamente qual versão foi apresentada (fix
+    -- v1.4.1, item 7) — mesma disciplina já aplicada em mark_message_sent.
     INSERT INTO rufino_linkedin.delivery_events (
-        connection_id, delivery_mode, event_type, event_at, actor
+        connection_id, delivery_mode, event_type, event_at, actor, metadata
     ) VALUES (
-        p_connection_id, 'MANUAL_ASSISTED', 'MENSAGEM_APRESENTADA', now(), p_actor
+        p_connection_id, 'MANUAL_ASSISTED', 'MENSAGEM_APRESENTADA', now(), p_actor,
+        jsonb_build_object('message_version_id', p_message_version_id)
     )
     RETURNING rufino_linkedin.delivery_events.delivery_event_id INTO v_delivery_event_id;
 
@@ -386,6 +451,8 @@ RETURNS TABLE (
     profile_url              text,
     conversation_url         text,
     status                   text,
+    message_version_id       uuid,
+    message_body             text,
     raw_pending_action_token text
 )
 LANGUAGE plpgsql
@@ -393,8 +460,10 @@ SECURITY DEFINER
 SET search_path = rufino_linkedin, extensions, pg_temp
 AS $fn$
 DECLARE
-    v_row    record;
-    v_token  text;
+    v_row              record;
+    v_token            text;
+    v_message_version  uuid;
+    v_message_body     text;
 BEGIN
     IF p_limit IS NULL OR p_limit <= 0 THEN
         RAISE EXCEPTION 'claim_due_connections: p_limit deve ser positivo';
@@ -419,6 +488,16 @@ BEGIN
                    'sistema', 'reivindicado por claim_due_connections', p_workflow_name, p_execution_id
                ) t;
 
+        -- Devolve também a versão de mensagem vigente (fix v1.4.1, item 3)
+        -- — o WF-02/WF-03 não precisa de uma segunda consulta separada para
+        -- montar a notificação de aprovação.
+        SELECT mv.message_version_id, mv.message_body
+          INTO v_message_version, v_message_body
+          FROM rufino_linkedin.message_versions mv
+         WHERE mv.connection_id = v_row.connection_id
+         ORDER BY mv.version DESC
+         LIMIT 1;
+
         connection_id     := v_row.connection_id;
         nome               := v_row.nome;
         primeiro_nome      := v_row.primeiro_nome;
@@ -428,6 +507,8 @@ BEGIN
         profile_url        := v_row.profile_url;
         conversation_url   := v_row.conversation_url;
         status             := 'AGUARDANDO_APROVACAO';
+        message_version_id := v_message_version;
+        message_body       := v_message_body;
         raw_pending_action_token := v_token;
         RETURN NEXT;
     END LOOP;
@@ -465,13 +546,15 @@ SECURITY DEFINER
 SET search_path = rufino_linkedin, extensions, pg_temp
 AS $fn$
 DECLARE
-    v_hash             text;
-    v_pending_hash     text;
-    v_pending_expires  timestamptz;
-    v_approval_id      uuid;
-    v_new_status       text;
-    v_raw_edit_token   text;
-    v_edit_hash        text;
+    v_hash                 text;
+    v_pending_hash         text;
+    v_pending_expires      timestamptz;
+    v_approval_id          uuid;
+    v_new_status           text;
+    v_raw_edit_token       text;
+    v_edit_hash            text;
+    v_version_belongs      boolean;
+    v_current_version_id   uuid;
 BEGIN
     IF p_connection_id IS NULL OR p_decision IS NULL OR p_approved_by IS NULL
        OR p_presented_action_token IS NULL THEN
@@ -480,6 +563,37 @@ BEGIN
 
     IF p_decision NOT IN ('APROVAR_E_PREPARAR', 'EDITAR', 'REFAZER', 'DESCARTAR') THEN
         RAISE EXCEPTION 'approve_message: decisao invalida "%"', p_decision;
+    END IF;
+
+    -- Integridade da mensagem (fix v1.4.1, item 7): p_message_version_id
+    -- nunca pode ser nulo, precisa pertencer a p_connection_id e precisa ser
+    -- a versão vigente — protege contra aprovar uma decisão baseada em
+    -- texto que já não é mais o apresentado (ex.: uma edição concorrente
+    -- via WF-03-EDIT mudou a versão entre o botão ser renderizado e clicado).
+    IF p_message_version_id IS NULL THEN
+        RAISE EXCEPTION 'approve_message: p_message_version_id obrigatorio (nao pode ser NULL)';
+    END IF;
+
+    SELECT EXISTS (
+        SELECT 1 FROM rufino_linkedin.message_versions mv
+         WHERE mv.message_version_id = p_message_version_id
+           AND mv.connection_id = p_connection_id
+    ) INTO v_version_belongs;
+
+    IF NOT v_version_belongs THEN
+        RAISE EXCEPTION 'approve_message: message_version_id % nao pertence a connection_id %',
+            p_message_version_id, p_connection_id;
+    END IF;
+
+    SELECT mv.message_version_id INTO v_current_version_id
+      FROM rufino_linkedin.message_versions mv
+     WHERE mv.connection_id = p_connection_id
+     ORDER BY mv.version DESC
+     LIMIT 1;
+
+    IF v_current_version_id IS DISTINCT FROM p_message_version_id THEN
+        RAISE EXCEPTION 'approve_message: message_version_id % nao e a versao vigente (%)',
+            p_message_version_id, v_current_version_id;
     END IF;
 
     -- Dedupe de defesa em profundidade por callback_query_id (a defesa
@@ -667,13 +781,15 @@ SECURITY DEFINER
 SET search_path = rufino_linkedin, extensions, pg_temp
 AS $fn$
 DECLARE
-    v_pending_hash     text;
-    v_pending_expires  timestamptz;
-    v_hash             text;
-    v_event_type       text;
-    v_new_status       text;
-    v_token            text;
-    v_delivery_event_id uuid;
+    v_pending_hash        text;
+    v_pending_expires     timestamptz;
+    v_hash                text;
+    v_event_type          text;
+    v_new_status          text;
+    v_token               text;
+    v_delivery_event_id   uuid;
+    v_version_belongs     boolean;
+    v_current_version_id  uuid;
 BEGIN
     IF p_connection_id IS NULL OR p_actor IS NULL OR p_presented_action_token IS NULL
        OR p_action IS NULL THEN
@@ -682,6 +798,35 @@ BEGIN
 
     IF p_action NOT IN ('MARCAR_ENVIADA', 'VOLTAR_EDITAR') THEN
         RAISE EXCEPTION 'mark_message_sent: acao invalida "%"', p_action;
+    END IF;
+
+    -- Integridade da mensagem (fix v1.4.1, item 7) — mesma validação de
+    -- approve_message: p_message_version_id nunca nulo, precisa pertencer a
+    -- p_connection_id e precisa ser a versão vigente.
+    IF p_message_version_id IS NULL THEN
+        RAISE EXCEPTION 'mark_message_sent: p_message_version_id obrigatorio (nao pode ser NULL)';
+    END IF;
+
+    SELECT EXISTS (
+        SELECT 1 FROM rufino_linkedin.message_versions mv
+         WHERE mv.message_version_id = p_message_version_id
+           AND mv.connection_id = p_connection_id
+    ) INTO v_version_belongs;
+
+    IF NOT v_version_belongs THEN
+        RAISE EXCEPTION 'mark_message_sent: message_version_id % nao pertence a connection_id %',
+            p_message_version_id, p_connection_id;
+    END IF;
+
+    SELECT mv.message_version_id INTO v_current_version_id
+      FROM rufino_linkedin.message_versions mv
+     WHERE mv.connection_id = p_connection_id
+     ORDER BY mv.version DESC
+     LIMIT 1;
+
+    IF v_current_version_id IS DISTINCT FROM p_message_version_id THEN
+        RAISE EXCEPTION 'mark_message_sent: message_version_id % nao e a versao vigente (%)',
+            p_message_version_id, v_current_version_id;
     END IF;
 
     IF p_callback_query_id IS NOT NULL AND EXISTS (
@@ -773,22 +918,46 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = rufino_linkedin, extensions, pg_temp
 AS $fn$
+DECLARE
+    -- Timeout de claim abandonado (fix v1.4.1, item 8): se um worker
+    -- reivindicou um followup (claimed_at preenchido) e nunca terminou de
+    -- processá-lo (executed_at continua NULL) depois desse tempo, o
+    -- followup volta a ficar elegível para reivindicação — protege contra
+    -- um worker que trava ou é encerrado no meio do processamento e deixa
+    -- o registro "preso" para sempre em claimed_at não-nulo. 1 hora é uma
+    -- folga generosa para o ciclo real desta jornada (notificar Anderson e
+    -- aguardar resposta no Telegram é rápido; se o worker realmente estiver
+    -- vivo e só demorado, ele volta a reivindicar sem problema, porque o
+    -- FOR UPDATE SKIP LOCKED abaixo só pega linhas cujo lock anterior já
+    -- foi liberado — na prática, um worker preso que ainda segura a
+    -- transação aberta continua protegido pelo lock de linha, não pelo
+    -- timeout). Ajustável se o padrão real de uso mostrar que 1 hora é
+    -- curto ou longo demais.
+    v_claim_timeout interval := interval '1 hour';
 BEGIN
     IF p_limit IS NULL OR p_limit <= 0 THEN
         RAISE EXCEPTION 'claim_due_followups: p_limit deve ser positivo';
     END IF;
 
-    -- SELECT ... FOR UPDATE SKIP LOCKED + marcação de claimed_at na mesma
-    -- transação (subselect com o lock, UPDATE aplica no resultado já
-    -- travado) — mesmo padrão de concorrência de claim_due_connections.
+    -- SELECT ... FOR UPDATE SKIP LOCKED + marcação de claimed_at/updated_at
+    -- na mesma transação (subselect com o lock, UPDATE aplica no resultado
+    -- já travado) — mesmo padrão de concorrência de claim_due_connections.
+    -- Elegível para reivindicação: nunca reivindicado (claimed_at IS NULL)
+    -- OU reivindicado há mais tempo que v_claim_timeout e ainda não
+    -- executado (claim abandonado por um worker interrompido).
     RETURN QUERY
     UPDATE rufino_linkedin.followups f
-       SET claimed_at = now()
+       SET claimed_at = now(),
+           updated_at = now()
       FROM (
                SELECT f2.followup_id
                  FROM rufino_linkedin.followups f2
-                WHERE f2.claimed_at IS NULL
-                  AND f2.scheduled_for <= now()
+                WHERE f2.scheduled_for <= now()
+                  AND f2.executed_at IS NULL
+                  AND (
+                        f2.claimed_at IS NULL
+                        OR f2.claimed_at <= now() - v_claim_timeout
+                      )
                 ORDER BY f2.scheduled_for
                 FOR UPDATE SKIP LOCKED
                 LIMIT p_limit
@@ -868,3 +1037,73 @@ $fn$;
 ALTER FUNCTION rufino_linkedin.record_workflow_error(
     uuid, text, text, text, jsonb, text, text, integer, text
 ) OWNER TO n8n_rufino_linkedin_owner_dev;
+
+
+-- =============================================================================
+-- Permissões (fix v1.4.1, itens 4 e 5) — dentro da MESMA transação que criou
+-- as 9 funções acima. Postgres concede EXECUTE a PUBLIC por padrão em
+-- funções novas: revogar isso é a primeira coisa a acontecer depois de cada
+-- CREATE FUNCTION, sem nenhuma janela em que a função recém-criada fica
+-- chamável por qualquer role com acesso ao banco.
+-- =============================================================================
+
+-- REVOKE EXECUTE FROM PUBLIC nas 9, sem exceção.
+REVOKE EXECUTE ON FUNCTION rufino_linkedin.register_connection(
+    text, text, text, text, text, text, text, text, date, text, jsonb, text, text, numeric, boolean, jsonb, text, text, text, text
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION rufino_linkedin.transition_connection_status(
+    uuid, text, text, text, text, text, text
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION rufino_linkedin.present_message_for_delivery(
+    uuid, uuid, text, text, text
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION rufino_linkedin.claim_due_connections(
+    integer, text, text
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION rufino_linkedin.approve_message(
+    uuid, uuid, text, text, text, text, text, text, text
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION rufino_linkedin.save_message_edit(
+    text, text, text, text, text
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION rufino_linkedin.mark_message_sent(
+    uuid, uuid, text, text, text, text, text, text
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION rufino_linkedin.claim_due_followups(
+    integer
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION rufino_linkedin.record_workflow_error(
+    uuid, text, text, text, jsonb, text, text, integer, text
+) FROM PUBLIC;
+
+-- GRANT EXECUTE para a role de aplicação — 8 das 9 funções. Note a ausência
+-- deliberada de transition_connection_status: é interna (fix v1.4.1, item
+-- 4) — as outras 8 continuam podendo chamá-la porque rodam como a mesma
+-- role owner (dona de todas as 9), e posse de função já implica EXECUTE
+-- sobre ela mesma, sem precisar de GRANT explícito.
+GRANT EXECUTE ON FUNCTION rufino_linkedin.register_connection(
+    text, text, text, text, text, text, text, text, date, text, jsonb, text, text, numeric, boolean, jsonb, text, text, text, text
+) TO n8n_rufino_linkedin_dev;
+GRANT EXECUTE ON FUNCTION rufino_linkedin.present_message_for_delivery(
+    uuid, uuid, text, text, text
+) TO n8n_rufino_linkedin_dev;
+GRANT EXECUTE ON FUNCTION rufino_linkedin.claim_due_connections(
+    integer, text, text
+) TO n8n_rufino_linkedin_dev;
+GRANT EXECUTE ON FUNCTION rufino_linkedin.approve_message(
+    uuid, uuid, text, text, text, text, text, text, text
+) TO n8n_rufino_linkedin_dev;
+GRANT EXECUTE ON FUNCTION rufino_linkedin.save_message_edit(
+    text, text, text, text, text
+) TO n8n_rufino_linkedin_dev;
+GRANT EXECUTE ON FUNCTION rufino_linkedin.mark_message_sent(
+    uuid, uuid, text, text, text, text, text, text
+) TO n8n_rufino_linkedin_dev;
+GRANT EXECUTE ON FUNCTION rufino_linkedin.claim_due_followups(
+    integer
+) TO n8n_rufino_linkedin_dev;
+GRANT EXECUTE ON FUNCTION rufino_linkedin.record_workflow_error(
+    uuid, text, text, text, jsonb, text, text, integer, text
+) TO n8n_rufino_linkedin_dev;
+
+COMMIT;
