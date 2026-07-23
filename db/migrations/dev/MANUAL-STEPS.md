@@ -1,4 +1,4 @@
-# Passos manuais — GATE 3 (banco DEV) — v1.4.1
+# Passos manuais — GATE 3 (banco DEV) — v1.4.2
 
 Este documento cobre exatamente as ações que **não** estão em nenhum arquivo `.sql` desta pasta, porque não devem estar: envolvem um segredo real. Nenhum arquivo desta migration contém, ou deve conter, uma senha real — só nomes lógicos e placeholders.
 
@@ -10,20 +10,21 @@ Ambiente: EasyPanel, projeto **rufino-linkedin-dev**, serviço de banco **linked
 - Requisitos mínimos: 32+ caracteres, gerada aleatoriamente (não uma frase memorizável reaproveitada de outro serviço).
 - Guarde a senha **somente** no cofre de credenciais do n8n (passo 3) e, se quiser um backup, num gerenciador de senhas pessoal — nunca em texto plano em disco, e-mail, chat ou arquivo deste repositório.
 
-## 2. Aplicar a senha manualmente na role de aplicação
+## 2. Aplicar a senha manualmente na role de aplicação (fix v1.4.2, item 8)
 
-Depois de rodar `002_roles_and_schema.sql` (que cria `n8n_rufino_linkedin_dev` **sem** senha), conecte-se ao banco `rufino-linkedin-dev` com uma credencial administrativa (a mesma usada para aplicar a migration) e rode, substituindo o placeholder pela senha real gerada no passo 1:
+Depois de rodar `002_roles_and_schema.sql` (que cria `n8n_rufino_linkedin_dev` **sem** senha), conecte-se ao banco `rufino-linkedin-dev` com uma credencial administrativa (a mesma usada para aplicar a migration) usando o cliente `psql` interativo, e rode:
 
-```sql
-ALTER ROLE n8n_rufino_linkedin_dev PASSWORD '<SENHA_REAL_AQUI>';
+```
+\password n8n_rufino_linkedin_dev
 ```
 
-- **Este comando não entra em nenhum arquivo versionado.** Rode-o direto num cliente SQL (psql, DBeaver, o console de banco do EasyPanel) e feche a sessão sem salvar o histórico com a senha em texto puro.
-- Nunca reutilize a senha de PROD ou de qualquer outro ambiente/projeto.
+Digite a senha gerada no passo 1 quando solicitado (duas vezes, para confirmação).
 
-**Comandos que exigem substituição manual antes de rodar** (nenhum outro arquivo desta migration tem esse tipo de placeholder):
+- **Por que `\password` e não `ALTER ROLE ... PASSWORD '<senha>'`:** o comando `\password` do `psql` lê a senha em modo **oculto** (echo desabilitado no terminal) e envia para o servidor já com hash — a senha em texto puro nunca é digitada em uma linha de comando SQL, nunca aparece ecoada na tela, nunca fica gravada em nenhum arquivo `.sql` versionado, nunca entra no Git, e não aparece em nenhum prompt escrito por esta skill nem em nenhum log de aplicação da migration (histórico do `psql`, logs do servidor com `log_statement`, scrollback de terminal salvo). Um `ALTER ROLE ... PASSWORD '<senha_real>'` digitado ou colado diretamente expõe a senha em texto puro em qualquer um desses lugares.
+- Depois de definida, a senha deve ser registrada **manualmente** na credencial Postgres do n8n (passo 3) — nunca reaproveitada de PROD ou de qualquer outro ambiente/projeto.
+- Feche a sessão do `psql` sem salvar histórico de comandos com a senha em texto puro (o próprio `\password` já evita isso, mas confirme que nenhum outro comando na mesma sessão ecoou a senha).
 
-- `ALTER ROLE n8n_rufino_linkedin_dev PASSWORD '<SENHA_REAL_AQUI>';` — substituir `<SENHA_REAL_AQUI>` pela senha gerada no passo 1.
+**Nenhum arquivo desta migration contém um placeholder de senha para substituição manual** — `002_roles_and_schema.sql` cria as roles sem senha alguma; a senha é aplicada inteiramente fora de qualquer arquivo, via `\password`, como descrito acima.
 
 ## 3. Cadastrar a credencial no n8n
 
@@ -39,12 +40,12 @@ No n8n de DEV (projeto **rufino-linkedin-dev**, serviço **n8n**), cadastre uma 
 | Senha | a senha real definida no passo 2 — colada diretamente no campo do cofre do n8n, nunca em texto de workflow, node ou arquivo |
 | SSL | conforme exigido pela configuração do serviço `linkedin-db` no EasyPanel |
 
-- **Nunca** cadastre uma credencial usando a role administrativa/superuser do serviço `linkedin-db` (equivalente a `postgres`) como credencial do n8n — só `n8n_rufino_linkedin_dev`, que tem exatamente `EXECUTE` em 8 das 9 funções + `SELECT` nas 8 tabelas (`transition_connection_status` é interna desde a v1.4.1 — ver seção 4 abaixo).
+- **Nunca** cadastre uma credencial usando a role administrativa/superuser do serviço `linkedin-db` (equivalente a `postgres`) como credencial do n8n — só `n8n_rufino_linkedin_dev`, que tem exatamente `EXECUTE` em 10 das 11 funções + `SELECT` nas 8 tabelas (`transition_connection_status` é interna — ver seção 4 abaixo).
 - Depois de cadastrada, teste a conexão dentro do próprio n8n (botão de teste da credencial) — isso não expõe a senha em lugar nenhum, só confirma que a conexão abre.
 
-## 4. Retomada manual de `ERRO` (fix v1.4.1, item 4)
+## 4. Retomada manual de `ERRO`
 
-Desde a v1.4.1, `transition_connection_status` é uma função **interna** — a role de aplicação (`n8n_rufino_linkedin_dev`) não tem mais `EXECUTE` nela, só as outras 8 funções (que rodam como a role owner) conseguem chamá-la. Isso fecha uma superfície de ataque desnecessária (o n8n nunca deveria poder pular direto para qualquer transição de status arbitrária), mas tem uma consequência prática: a única transição que a arquitetura sempre tratou como manual — tirar uma conexão do estado `ERRO` depois de confirmação humana (ver `references/statuses.md` da skill) — agora também exige uma sessão administrativa, não pode mais ser feita chamando a função como se fosse a própria credencial do n8n.
+`transition_connection_status` é uma função **interna** — a role de aplicação (`n8n_rufino_linkedin_dev`) não tem `EXECUTE` nela, só as outras 10 funções (que rodam como a role owner) conseguem chamá-la. Isso fecha uma superfície de ataque desnecessária (o n8n nunca deveria poder pular direto para qualquer transição de status arbitrária), mas tem uma consequência prática: a única transição que a arquitetura sempre tratou como manual — tirar uma conexão do estado `ERRO` depois de confirmação humana (ver `references/statuses.md` da skill) — exige uma sessão administrativa, não pode ser feita chamando a função como se fosse a própria credencial do n8n.
 
 Procedimento administrativo (até existir uma função própria, mais restrita, dedicada a isso — ver observação no fim desta seção):
 
@@ -59,29 +60,43 @@ Procedimento administrativo (até existir uma função própria, mais restrita, 
    ```
 4. `RESET ROLE;` ao terminar.
 
-Isso é intencionalmente um procedimento administrativo, não uma automação — a retomada de `ERRO` nunca deve ser silenciosa ou automática. Uma versão futura desta jornada pode adicionar uma décima função, `SECURITY DEFINER` e com `EXECUTE` restrito (ex.: só aceitando `p_expected_current_status='ERRO'`, com seus próprios logs/auditoria dedicados), para que essa retomada não precise mais de uma sessão administrativa — isso é uma evolução documentada, não algo pendente desta migration.
+Isso é intencionalmente um procedimento administrativo, não uma automação — a retomada de `ERRO` nunca deve ser silenciosa ou automática. Uma versão futura desta jornada pode adicionar uma décima segunda função, `SECURITY DEFINER` e com `EXECUTE` restrito (ex.: só aceitando `p_expected_current_status='ERRO'`, com seus próprios logs/auditoria dedicados), para que essa retomada não precise mais de uma sessão administrativa — isso é uma evolução documentada, não algo pendente desta migration.
 
-## 5. Checklist antes da migration
+## 5. Roles já existentes de uma tentativa anterior (fix v1.4.2, correção 5)
+
+Desde a v1.4.2, `002_roles_and_schema.sql` **não corrige silenciosamente** nenhuma role que já exista com atributos divergentes do esperado — ele **aborta** a migration com uma mensagem clara se encontrar:
+
+- `n8n_rufino_linkedin_owner_dev` já existente com `LOGIN`, `SUPERUSER`, `BYPASSRLS`, `CREATEDB`, `CREATEROLE` ou `REPLICATION` habilitados (owner deve ser estritamente `NOLOGIN` e sem nenhum desses privilégios).
+- `n8n_rufino_linkedin_dev` já existente sem `LOGIN`, ou com `SUPERUSER`, `BYPASSRLS`, `CREATEDB`, `CREATEROLE` ou `REPLICATION` habilitados.
+- `n8n_rufino_linkedin_dev` já sendo membro de `n8n_rufino_linkedin_owner_dev` (a role de aplicação nunca deve herdar privilégios da owner).
+
+Se a migration abortar nesse ponto, a correção é **manual e deliberada** — inspecione a role divergente (`SELECT * FROM pg_roles WHERE rolname = '...'`), decida com a equipe se ela deve ser recriada do zero (`DROP ROLE` + reaplicar `002`) ou ajustada (`ALTER ROLE`), e só então reaplique `002_roles_and_schema.sql`. Nunca contorne o abort comentando a validação.
+
+## 6. Checklist antes da migration
 
 - [ ] Backup ou snapshot recente do banco `rufino-linkedin-dev` confirmado (mesmo em DEV — evita retrabalho se algo sair diferente do esperado).
 - [ ] Confirmado, por consulta direta ao banco, que `pgcrypto` está instalada no schema `extensions` (já confirmado nesta rodada por consulta real em `pg_extension`: versão 1.3) — `001_preflight.sql` reconfirma isso automaticamente e aborta se divergir.
 - [ ] Confirmado que o banco atual ao rodar a migration é de fato `rufino-linkedin-dev` (não `n8n-db`, não um banco de PROD).
-- [ ] Nenhuma das roles `n8n_rufino_linkedin_owner_dev` / `n8n_rufino_linkedin_dev` já existe com definição divergente (a migration usa `IF NOT EXISTS`, mas revise se já havia algo com esse nome de uma tentativa anterior).
-- [ ] Arquivos `001` a `007` revisados nesta ordem, sem pular nenhum (`007` é um stub documental desde a v1.4.1 — não tem SQL para revisar, só o comentário explicando por quê).
+- [ ] Nenhuma das roles `n8n_rufino_linkedin_owner_dev` / `n8n_rufino_linkedin_dev` já existe com definição divergente (ver seção 5 acima — a migration agora aborta em vez de corrigir sozinha).
+- [ ] Arquivos `001` a `007` revisados nesta ordem, sem pular nenhum (`007` é um stub documental — não tem SQL para revisar, só o comentário explicando por quê).
 - [ ] Ninguém aplicou ainda nenhum destes arquivos neste banco (evitar reaplicação parcial fora de ordem).
+- [ ] Todos os arquivos `001`–`009` serão aplicados com `psql -v ON_ERROR_STOP=1 -f <arquivo>` — sem essa flag um erro no meio do arquivo não interrompe o `psql`.
 
-## 6. Checklist depois da migration
+## 7. Checklist depois da migration
 
-- [ ] `008_validation_queries.sql` executado (manualmente, uma consulta de cada vez) e todos os 13 resultados batem com o "Esperado" comentado em cada bloco.
+- [ ] `008_validation_queries.sql` executado (manualmente, uma consulta de cada vez) e todos os 19 resultados batem com o "Esperado" comentado em cada bloco.
 - [ ] `009_smoke_tests.sql` executado com sucesso (todas as linhas `SMOKE OK`, nenhuma `SMOKE FALHOU`) — roda e desfaz sozinho (`ROLLBACK`), pode repetir quantas vezes quiser.
-- [ ] Senha real aplicada na role `n8n_rufino_linkedin_dev` (passo 2) e credencial cadastrada no n8n (passo 3).
+- [ ] Senha real aplicada na role `n8n_rufino_linkedin_dev` via `\password` (passo 2) e credencial cadastrada no n8n (passo 3).
 - [ ] Teste de conexão da credencial no n8n bem-sucedido.
 - [ ] Nenhuma senha real ficou em nenhum arquivo deste repositório, em nenhum log de terminal salvo, ou em qualquer mensagem de chat.
-- [ ] `EXECUTE` confirmado: 8 das 9 funções para `n8n_rufino_linkedin_dev`; `transition_connection_status` **sem** `EXECUTE` para a role de aplicação (consultas 4 e 4b de `008_validation_queries.sql`).
-- [ ] `SELECT`-only confirmado para a role de aplicação nas 8 tabelas — nenhum `INSERT`/`UPDATE`/`DELETE` (consulta 5).
+- [ ] `EXECUTE` confirmado: 10 das 11 funções para `n8n_rufino_linkedin_dev`; `transition_connection_status` **sem** `EXECUTE` para a role de aplicação, e **nenhuma** das 11 com `EXECUTE` para `PUBLIC` (consultas 2 e 4 de `008_validation_queries.sql`).
+- [ ] `SELECT`-only confirmado para a role de aplicação nas 8 tabelas — nenhum `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` (consulta 5).
 - [ ] RLS habilitado nas 8 tabelas, **`FORCE` desabilitado** (consulta 6 — importante: `rls_forcado` deve ser `false`, não `true`).
-- [ ] Role de aplicação confirmada sem `SUPERUSER`/`BYPASSRLS`/`CREATEDB`/`CREATEROLE`/`REPLICATION` (consulta 7).
+- [ ] Role de aplicação confirmada sem `SUPERUSER`/`BYPASSRLS`/`CREATEDB`/`CREATEROLE`/`REPLICATION`, e sem ser membro da owner (consultas 7 e 19).
 - [ ] Grants de `pgcrypto` confirmados: owner com `USAGE` em `extensions` + `EXECUTE` em `digest`/`gen_random_bytes`; role de aplicação **sem** `USAGE` em `extensions` (consulta 11).
 - [ ] Toda `connections` com sua `message_versions` de `version=1`/`source='gpt'` (consulta 12 — só relevante depois de existirem dados reais).
+- [ ] Novas colunas confirmadas: `connections.pending_regeneration_token_hash`/`pending_regeneration_token_expires_at`, `followups.callback_query_id` (consulta 14); nenhuma coluna de token bruto (`regeneration_token` sem sufixo `_hash`) existe em `connections` (consulta 16).
+- [ ] Constraint `UNIQUE` de `followups.callback_query_id` confirmada (consulta 15).
+- [ ] Nenhum status não-terminal sem transição de saída, conforme lista de arestas de `transition_connection_status` (consulta 17 — estrutural, espelha o SQL real).
 - [ ] Rollback (`rollback/001_rollback.sql`) revisado e compreendido pela equipe — sem executá-lo — como plano de contingência.
 - [ ] GATE 3 (banco DEV) atualizado para refletir que a migration foi gerada e revisada; aplicação real segue pendente de confirmação explícita separada.

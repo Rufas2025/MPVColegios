@@ -1,6 +1,8 @@
 -- =============================================================================
 -- 004_constraints_and_indexes.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV)
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
+--
+-- Aplicar com: psql -v ON_ERROR_STOP=1 -f 004_constraints_and_indexes.sql
 --
 -- Foreign keys, UNIQUE, CHECK e índices das 8 tabelas criadas em
 -- 003_tables.sql. Nenhuma tabela fica "solta" sem estas garantias.
@@ -8,6 +10,11 @@
 -- ATOMICIDADE (fix v1.4.1, item 5): todo o arquivo roda dentro de uma única
 -- transação — uma FK ou índice que falhar não deixa metade das constraints
 -- aplicadas.
+--
+-- v1.4.2 (Correção 3): novos índices para as colunas/tabelas adicionadas
+-- (regeneration token em connections, callback_query_id em followups,
+-- execution_id em workflow_errors) e reformulação do índice parcial de
+-- followups para cobrir também o ramo de claim abandonado.
 -- =============================================================================
 
 BEGIN;
@@ -27,6 +34,15 @@ CREATE INDEX connections_status_scheduled_at_idx
     ON rufino_linkedin.connections (status, scheduled_at);
 CREATE INDEX connections_status_idx
     ON rufino_linkedin.connections (status);
+
+-- v1.4.2: lookups por hash de token, usados por save_message_edit e
+-- save_regenerated_message (connection_id ainda não é conhecido nesses
+-- pontos — é resolvido a partir de qual linha tem o hash). Parciais porque
+-- a maioria das linhas tem esses campos NULL na maior parte do tempo.
+CREATE INDEX connections_active_edit_token_hash_idx
+    ON rufino_linkedin.connections (active_edit_token_hash) WHERE active_edit_token_hash IS NOT NULL;
+CREATE INDEX connections_pending_regeneration_token_hash_idx
+    ON rufino_linkedin.connections (pending_regeneration_token_hash) WHERE pending_regeneration_token_hash IS NOT NULL;
 
 -- -----------------------------------------------------------------------------
 -- analyses
@@ -91,10 +107,16 @@ ALTER TABLE rufino_linkedin.followups
     ADD CONSTRAINT followups_resultado_check CHECK (
         resultado IS NULL OR resultado IN ('RESPONDEU', 'SEM_RESPOSTA')
     ),
-    ADD CONSTRAINT followups_connection_sequence_key UNIQUE (connection_id, sequence);
+    ADD CONSTRAINT followups_connection_sequence_key UNIQUE (connection_id, sequence),
+    ADD CONSTRAINT followups_callback_query_id_key UNIQUE (callback_query_id);
 
+-- v1.4.2: o índice parcial passa a ser sobre executed_at IS NULL (não mais
+-- claimed_at IS NULL) — claim_due_followups agora reivindica tanto linhas
+-- nunca reivindicadas quanto claims abandonados (claimed_at antigo), e o
+-- filtro comum aos dois ramos é sempre executed_at IS NULL; claimed_at é
+-- avaliado em memória sobre o conjunto já reduzido por este índice.
 CREATE INDEX followups_scheduled_for_pending_idx
-    ON rufino_linkedin.followups (scheduled_for) WHERE claimed_at IS NULL;
+    ON rufino_linkedin.followups (scheduled_for) WHERE executed_at IS NULL;
 CREATE INDEX followups_connection_id_idx ON rufino_linkedin.followups (connection_id);
 
 -- -----------------------------------------------------------------------------
@@ -107,6 +129,11 @@ ALTER TABLE rufino_linkedin.workflow_errors
 CREATE INDEX workflow_errors_source_workflow_resolved_idx
     ON rufino_linkedin.workflow_errors (source_workflow, resolved);
 CREATE INDEX workflow_errors_connection_id_idx ON rufino_linkedin.workflow_errors (connection_id);
+
+-- v1.4.2 (Correção 4): apoia a checagem de idempotência por execution_id em
+-- record_workflow_error. Parcial porque execution_id é opcional.
+CREATE INDEX workflow_errors_execution_id_idx
+    ON rufino_linkedin.workflow_errors (execution_id, source_workflow, error_type) WHERE execution_id IS NOT NULL;
 
 -- -----------------------------------------------------------------------------
 -- connection_status_history

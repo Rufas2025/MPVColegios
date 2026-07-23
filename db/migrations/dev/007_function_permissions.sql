@@ -1,28 +1,32 @@
 -- =============================================================================
 -- 007_function_permissions.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
 --
 -- ESTE ARQUIVO NÃO CONTÉM SQL EXECUTÁVEL. Ele existe só para preservar a
 -- numeração e a documentação da migration — o conteúdo que antes vivia
--- aqui (REVOKE EXECUTE FROM PUBLIC + GRANT EXECUTE das 9 funções) foi
--- MOVIDO para dentro de 006_functions.sql (fix v1.4.1, item 5:
--- atomicidade).
+-- aqui (REVOKE EXECUTE FROM PUBLIC + GRANT EXECUTE das 11 funções) foi
+-- MOVIDO para dentro de 006_functions.sql (atomicidade — ver cabeçalho
+-- daquele arquivo).
 --
--- Motivo da mudança: na v1.4.0, 006 e 007 eram transações separadas.
+-- Motivo da mudança: até a v1.4.0, 006 e 007 eram transações separadas.
 -- Postgres concede EXECUTE a PUBLIC por padrão em toda função nova — entre
 -- o COMMIT de 006 (funções criadas, ainda com o grant padrão a PUBLIC
 -- valendo) e a aplicação de 007 (que revogava esse grant), existia uma
--- janela real em que qualquer role com acesso ao banco podia chamar as 9
--- funções recém-criadas. A partir da v1.4.1, a criação das funções e o
+-- janela real em que qualquer role com acesso ao banco podia chamar as
+-- funções recém-criadas. Desde a v1.4.1, a criação das funções e o
 -- travamento de permissões (REVOKE FROM PUBLIC + GRANT só para
 -- n8n_rufino_linkedin_dev, exceto transition_connection_status, que fica
--- só com o REVOKE — ver fix v1.4.1, item 4) acontecem dentro do mesmo
--- BEGIN...COMMIT de 006_functions.sql. Não há mais nenhuma janela entre a
--- criação de uma função e o fechamento de suas permissões.
+-- só com o REVOKE) acontecem dentro do mesmo BEGIN...COMMIT de
+-- 006_functions.sql. Não há nenhuma janela entre a criação de uma função e
+-- o fechamento de suas permissões.
+--
+-- v1.4.2: as 2 funções novas (save_regenerated_message, complete_followup)
+-- seguem a mesma disciplina — criadas e trancadas dentro de 006, nunca
+-- aqui.
 --
 -- Se este arquivo aparecer numa aplicação real da migration, ele não faz
 -- nada (nenhum comando SQL abaixo) — isso é intencional, não um passo
--- esquecido. Mantido na sequência 001–008 só para não renumerar os demais
+-- esquecido. Mantido na sequência 001–009 só para não renumerar os demais
 -- arquivos e para quem revisar a migration entender por que o passo "7"
 -- está vazio.
 -- =============================================================================

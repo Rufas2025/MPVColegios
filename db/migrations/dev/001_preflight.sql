@@ -1,7 +1,12 @@
 -- =============================================================================
 -- 001_preflight.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV)
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
 -- Ambiente: DEV — EasyPanel, projeto rufino-linkedin-dev, serviço n8n / linkedin-db
+--
+-- Aplicar com: psql -v ON_ERROR_STOP=1 -f 001_preflight.sql (vale para todos
+-- os arquivos 001–009 desta migration — sem essa flag, um erro no meio de
+-- um arquivo não interrompe o psql, que segue tentando rodar os comandos
+-- seguintes dentro da mesma transação já abortada).
 --
 -- Objetivo: validar pré-condições antes de qualquer objeto ser criado.
 -- Este script é SOMENTE LEITURA — não cria, altera, remove ou move nenhum

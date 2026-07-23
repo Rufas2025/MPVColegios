@@ -1,6 +1,8 @@
 -- =============================================================================
 -- 002_roles_and_schema.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
+--
+-- Aplicar com: psql -v ON_ERROR_STOP=1 -f 002_roles_and_schema.sql
 --
 -- Cria o schema privado rufino_linkedin e as duas roles dedicadas do
 -- ambiente DEV:
@@ -11,13 +13,22 @@
 -- placeholder que possa ser executado acidentalmente como senha válida.
 -- A role de aplicação é criada com LOGIN mas SEM cláusula PASSWORD — nesse
 -- estado, autenticação por senha falha até que Anderson rode manualmente,
--- fora do controle de versão, um comando equivalente a:
---     ALTER ROLE n8n_rufino_linkedin_dev PASSWORD '<senha forte gerada fora deste repositório>';
--- Ver MANUAL-STEPS.md para o procedimento completo.
+-- via `\password n8n_rufino_linkedin_dev` (prompt oculto, nunca em texto de
+-- comando — fix v1.4.2, Correção 8). Ver MANUAL-STEPS.md para o
+-- procedimento completo.
 --
 -- ATOMICIDADE (fix v1.4.1, item 5): todo o arquivo roda dentro de uma única
 -- transação — se qualquer instrução falhar, nada deste arquivo fica
 -- meio-aplicado.
+--
+-- ROLES JÁ EXISTENTES (v1.4.2, Correção 5): se `n8n_rufino_linkedin_owner_dev`
+-- ou `n8n_rufino_linkedin_dev` já existirem (reaplicação, ou reaproveitadas
+-- de uma tentativa anterior), este arquivo NÃO as recria nem corrige
+-- atributos divergentes silenciosamente — ele consulta `pg_roles`, valida
+-- que os atributos batem exatamente com o esperado, e ABORTA com uma
+-- mensagem clara se não baterem. Corrigir uma role com privilégio
+-- administrativo perigoso (ex.: SUPERUSER, BYPASSRLS) por engano de forma
+-- automática seria pior do que parar e pedir revisão manual.
 -- =============================================================================
 
 BEGIN;
@@ -35,8 +46,18 @@ COMMENT ON SCHEMA rufino_linkedin IS
 -- EXECUTE.
 -- ---------------------------------------------------------------------------
 DO $$
+DECLARE
+    v_exists          boolean;
+    v_rolcanlogin     boolean;
+    v_rolsuper        boolean;
+    v_rolbypassrls    boolean;
+    v_rolcreatedb     boolean;
+    v_rolcreaterole   boolean;
+    v_rolreplication  boolean;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'n8n_rufino_linkedin_owner_dev') THEN
+    SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'n8n_rufino_linkedin_owner_dev') INTO v_exists;
+
+    IF NOT v_exists THEN
         CREATE ROLE n8n_rufino_linkedin_owner_dev
             NOLOGIN
             NOSUPERUSER
@@ -44,6 +65,15 @@ BEGIN
             NOCREATEROLE
             NOREPLICATION
             NOBYPASSRLS;
+    ELSE
+        SELECT rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication
+          INTO v_rolcanlogin, v_rolsuper, v_rolbypassrls, v_rolcreatedb, v_rolcreaterole, v_rolreplication
+          FROM pg_roles WHERE rolname = 'n8n_rufino_linkedin_owner_dev';
+
+        IF v_rolcanlogin OR v_rolsuper OR v_rolbypassrls OR v_rolcreatedb OR v_rolcreaterole OR v_rolreplication THEN
+            RAISE EXCEPTION 'PREFLIGHT DE ROLE FALHOU: n8n_rufino_linkedin_owner_dev ja existe com atributos divergentes do esperado (esperado: NOLOGIN, NOSUPERUSER, NOBYPASSRLS, NOCREATEDB, NOCREATEROLE, NOREPLICATION — encontrado: rolcanlogin=%, rolsuper=%, rolbypassrls=%, rolcreatedb=%, rolcreaterole=%, rolreplication=%). Esta migration nao corrige privilegios administrativos silenciosamente — revise a role existente manualmente antes de reaplicar.',
+                v_rolcanlogin, v_rolsuper, v_rolbypassrls, v_rolcreatedb, v_rolcreaterole, v_rolreplication;
+        END IF;
     END IF;
 END;
 $$;
@@ -65,8 +95,18 @@ COMMENT ON ROLE n8n_rufino_linkedin_owner_dev IS
 -- REPLICATION — regra de segurança fechada para esta migration.
 -- ---------------------------------------------------------------------------
 DO $$
+DECLARE
+    v_exists          boolean;
+    v_rolcanlogin     boolean;
+    v_rolsuper        boolean;
+    v_rolbypassrls    boolean;
+    v_rolcreatedb     boolean;
+    v_rolcreaterole   boolean;
+    v_rolreplication  boolean;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'n8n_rufino_linkedin_dev') THEN
+    SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'n8n_rufino_linkedin_dev') INTO v_exists;
+
+    IF NOT v_exists THEN
         CREATE ROLE n8n_rufino_linkedin_dev
             LOGIN
             NOSUPERUSER
@@ -78,12 +118,47 @@ BEGIN
         -- Nenhuma cláusula PASSWORD acima, de propósito — ver cabeçalho deste
         -- arquivo e MANUAL-STEPS.md. Sem senha definida, o login por senha
         -- falha até a ação manual de Anderson.
+    ELSE
+        SELECT rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication
+          INTO v_rolcanlogin, v_rolsuper, v_rolbypassrls, v_rolcreatedb, v_rolcreaterole, v_rolreplication
+          FROM pg_roles WHERE rolname = 'n8n_rufino_linkedin_dev';
+
+        IF NOT v_rolcanlogin OR v_rolsuper OR v_rolbypassrls OR v_rolcreatedb OR v_rolcreaterole OR v_rolreplication THEN
+            RAISE EXCEPTION 'PREFLIGHT DE ROLE FALHOU: n8n_rufino_linkedin_dev ja existe com atributos divergentes do esperado (esperado: LOGIN, NOSUPERUSER, NOBYPASSRLS, NOCREATEDB, NOCREATEROLE, NOREPLICATION — encontrado: rolcanlogin=%, rolsuper=%, rolbypassrls=%, rolcreatedb=%, rolcreaterole=%, rolreplication=%). Esta migration nao corrige privilegios administrativos silenciosamente — revise a role existente manualmente antes de reaplicar.',
+                v_rolcanlogin, v_rolsuper, v_rolbypassrls, v_rolcreatedb, v_rolcreaterole, v_rolreplication;
+        END IF;
     END IF;
 END;
 $$;
 
 COMMENT ON ROLE n8n_rufino_linkedin_dev IS
     'Role de aplicação usada pela credencial Postgres do n8n (DEV, serviço linkedin-db). Sem SUPERUSER/BYPASSRLS/CREATEDB/CREATEROLE/REPLICATION. Senha definida manualmente fora desta migration — ver MANUAL-STEPS.md.';
+
+-- ---------------------------------------------------------------------------
+-- Membership (v1.4.2, Correção 5): a role de aplicação NUNCA pode ser membro
+-- da role owner — se fosse, ela herdaria (por concessão de role) todos os
+-- privilégios da owner, inclusive a propriedade das tabelas/funções,
+-- quebrando por completo o isolamento que SECURITY DEFINER foi desenhado
+-- para garantir. Aborta em vez de tentar corrigir sozinho.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    v_is_member boolean;
+BEGIN
+    SELECT EXISTS (
+        SELECT 1
+          FROM pg_auth_members m
+          JOIN pg_roles r_member ON r_member.oid = m.member
+          JOIN pg_roles r_role   ON r_role.oid = m.roleid
+         WHERE r_member.rolname = 'n8n_rufino_linkedin_dev'
+           AND r_role.rolname = 'n8n_rufino_linkedin_owner_dev'
+    ) INTO v_is_member;
+
+    IF v_is_member THEN
+        RAISE EXCEPTION 'PREFLIGHT DE ROLE FALHOU: n8n_rufino_linkedin_dev ja e membro de n8n_rufino_linkedin_owner_dev. Isso concederia a ela, por heranca de role, os privilegios da owner (dona de todas as tabelas/funcoes), quebrando o isolamento SECURITY DEFINER desta arquitetura. Corrija manualmente (REVOKE n8n_rufino_linkedin_owner_dev FROM n8n_rufino_linkedin_dev) antes de reaplicar.';
+    END IF;
+END;
+$$;
 
 -- Dono do schema: a role owner (objetos criados nas próximas migrations
 -- recebem OWNER TO explícito para essa role).

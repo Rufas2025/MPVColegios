@@ -1,13 +1,15 @@
 -- =============================================================================
 -- 005_rls_and_grants.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
+--
+-- Aplicar com: psql -v ON_ERROR_STOP=1 -f 005_rls_and_grants.sql
 --
 -- Isolamento primário desta arquitetura: (1) schema rufino_linkedin privado,
 -- sem USAGE para PUBLIC; (2) grants mínimos — a role de aplicação só recebe
--- EXECUTE (nas 8 funções voltadas ao n8n, ver 006_functions.sql) e SELECT
--- (nas tabelas, aqui) — nunca INSERT/UPDATE/DELETE direto. RLS é uma
--- terceira camada de defesa (útil contra erro de configuração futuro), não
--- o mecanismo primário.
+-- EXECUTE (nas 10 funções voltadas ao n8n, ver 006_functions.sql) e SELECT
+-- (nas tabelas, aqui) — nunca INSERT/UPDATE/DELETE/TRUNCATE direto. RLS é
+-- uma terceira camada de defesa (útil contra erro de configuração futuro),
+-- não o mecanismo primário.
 --
 -- Não existe aqui nenhum conceito de "service_role"/Data API/Supavisor —
 -- este é PostgreSQL self-hosted no EasyPanel. O equivalente de risco a
@@ -85,10 +87,10 @@ CREATE POLICY connection_status_history_select_app ON rufino_linkedin.connection
     FOR SELECT TO n8n_rufino_linkedin_dev USING (true);
 
 -- -----------------------------------------------------------------------------
--- Grants da role de aplicação: apenas SELECT. Nenhum INSERT/UPDATE/DELETE
--- direto em nenhuma tabela — toda escrita operacional passa pelas 8 funções
--- voltadas ao n8n (ver 006_functions.sql). Sem DELETE em nenhuma tabela, por
--- nenhuma role, no caminho operacional normal.
+-- Grants da role de aplicação: apenas SELECT. Nenhum INSERT/UPDATE/DELETE/
+-- TRUNCATE direto em nenhuma tabela — toda escrita operacional passa pelas
+-- 10 funções voltadas ao n8n (ver 006_functions.sql). Sem DELETE em nenhuma
+-- tabela, por nenhuma role, no caminho operacional normal.
 -- -----------------------------------------------------------------------------
 GRANT SELECT ON
     rufino_linkedin.connections,

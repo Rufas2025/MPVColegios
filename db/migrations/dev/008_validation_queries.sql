@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 008_validation_queries.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
 --
 -- SOMENTE LEITURA. Nenhuma instrução aqui cria, altera ou remove qualquer
 -- objeto — só SELECT, para conferir depois de aplicar 001–007 que o
@@ -16,16 +16,16 @@ SELECT table_name
 -- Esperado (8 linhas): analyses, approvals, connection_status_history,
 -- connections, delivery_events, followups, message_versions, workflow_errors.
 
--- 2) 9 funções esperadas no schema rufino_linkedin.
+-- 2) 11 funções esperadas no schema rufino_linkedin.
 SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE n.nspname = 'rufino_linkedin'
  ORDER BY p.proname;
--- Esperado (9 linhas): approve_message, claim_due_connections,
--- claim_due_followups, mark_message_sent, present_message_for_delivery,
--- record_workflow_error, register_connection, save_message_edit,
--- transition_connection_status.
+-- Esperado (11 linhas): approve_message, claim_due_connections,
+-- claim_due_followups, complete_followup, mark_message_sent,
+-- present_message_for_delivery, record_workflow_error, register_connection,
+-- save_message_edit, save_regenerated_message, transition_connection_status.
 
 -- 3) Todas as funções são SECURITY DEFINER, de propriedade da role owner,
 --    com search_path fixado explicitamente.
@@ -41,10 +41,10 @@ SELECT p.proname,
 -- n8n_rufino_linkedin_owner_dev em todas; config_search_path contendo
 -- "search_path=rufino_linkedin, extensions, pg_temp" em todas.
 
--- 4) EXECUTE das 9 funções: 8 executáveis por n8n_rufino_linkedin_dev,
+-- 4) EXECUTE das 11 funções: 10 executáveis por n8n_rufino_linkedin_dev,
 --    1 interna (transition_connection_status) só acessível à role owner e
---    às outras 8 funções que a chamam por dentro; PUBLIC nunca em nenhuma
---    das 9 (fix v1.4.1, item 4).
+--    às outras 10 funções que a chamam por dentro; PUBLIC nunca em nenhuma
+--    das 11.
 SELECT p.proname,
        has_function_privilege('n8n_rufino_linkedin_dev', p.oid, 'EXECUTE') AS app_pode_executar,
        has_function_privilege('public', p.oid, 'EXECUTE')                  AS public_pode_executar
@@ -52,14 +52,15 @@ SELECT p.proname,
   JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE n.nspname = 'rufino_linkedin'
  ORDER BY p.proname;
--- Esperado: public_pode_executar = false em TODAS as 9. app_pode_executar =
--- true em 8 (register_connection, present_message_for_delivery,
+-- Esperado: public_pode_executar = false em TODAS as 11. app_pode_executar =
+-- true em 10 (register_connection, present_message_for_delivery,
 -- claim_due_connections, approve_message, save_message_edit,
--- mark_message_sent, claim_due_followups, record_workflow_error) e = false
--- só em transition_connection_status.
+-- save_regenerated_message, mark_message_sent, claim_due_followups,
+-- complete_followup, record_workflow_error) e = false só em
+-- transition_connection_status.
 
 -- 4b) Confirmação direta e nomeada do item acima, para não depender de
---     conferir 9 linhas manualmente: conta quantas são executáveis pela
+--     conferir 11 linhas manualmente: conta quantas são executáveis pela
 --     role de aplicação.
 SELECT
     count(*) FILTER (WHERE has_function_privilege('n8n_rufino_linkedin_dev', p.oid, 'EXECUTE')) AS executaveis_pela_app,
@@ -67,7 +68,7 @@ SELECT
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE n.nspname = 'rufino_linkedin';
--- Esperado: executaveis_pela_app = 8, total_funcoes = 9.
+-- Esperado: executaveis_pela_app = 10, total_funcoes = 11.
 
 -- 5) Grants de tabela da role de aplicação: só SELECT, nunca INSERT/UPDATE/DELETE.
 SELECT table_name, privilege_type
@@ -150,9 +151,8 @@ SELECT c.connection_id
 
 -- 13) Followups: nenhuma linha com claimed_at preenchido, executed_at nulo
 --     e mais velha que o timeout de claim abandonado sem já ter sido
---     reivindicada de novo (auditoria do fix v1.4.1, item 8 — só é
---     informativo, não indica erro por si só, já que pode ser um claim
---     legitimamente em andamento).
+--     reivindicada de novo (só é informativo, não indica erro por si só,
+--     já que pode ser um claim legitimamente em andamento).
 SELECT followup_id, connection_id, claimed_at, executed_at, updated_at
   FROM rufino_linkedin.followups
  WHERE claimed_at IS NOT NULL
@@ -160,3 +160,88 @@ SELECT followup_id, connection_id, claimed_at, executed_at, updated_at
    AND claimed_at <= now() - interval '1 hour';
 -- Informativo: linhas aqui são candidatas a reivindicação pelo próximo
 -- claim_due_followups (não é, por si só, um erro de migration).
+
+-- 14) Colunas novas da v1.4.2 existem com o tipo esperado (Correção 1:
+--     regeneration token em connections; Correção 2: callback_query_id em
+--     followups).
+SELECT table_name, column_name, data_type
+  FROM information_schema.columns
+ WHERE table_schema = 'rufino_linkedin'
+   AND (
+         (table_name = 'connections' AND column_name IN ('pending_regeneration_token_hash', 'pending_regeneration_token_expires_at'))
+      OR (table_name = 'followups' AND column_name = 'callback_query_id')
+   )
+ ORDER BY table_name, column_name;
+-- Esperado (3 linhas): connections.pending_regeneration_token_expires_at
+-- (timestamp with time zone), connections.pending_regeneration_token_hash
+-- (text), followups.callback_query_id (text).
+
+-- 15) UNIQUE de followups.callback_query_id existe (Correção 2/6 —
+--     dedupe de complete_followup).
+SELECT conname, contype
+  FROM pg_constraint c
+  JOIN pg_class t ON t.oid = c.conrelid
+  JOIN pg_namespace n ON n.oid = t.relnamespace
+ WHERE n.nspname = 'rufino_linkedin'
+   AND t.relname = 'followups'
+   AND conname = 'followups_callback_query_id_key';
+-- Esperado: 1 linha, contype = 'u' (UNIQUE).
+
+-- 16) Nenhuma tabela contém coluna de valor bruto de regeneration_token
+--     (mesma auditoria estrutural do item 10, estendida à v1.4.2).
+SELECT table_name, column_name
+  FROM information_schema.columns
+ WHERE table_schema = 'rufino_linkedin'
+   AND column_name ILIKE '%regeneration_token%'
+   AND column_name NOT LIKE '%_hash'
+   AND column_name NOT LIKE '%_expires_at';
+-- Esperado: 0 linhas. Só pending_regeneration_token_hash e
+-- pending_regeneration_token_expires_at devem existir.
+
+-- 17) Estados sem saída (auditoria estrutural do modelo de transições —
+--     Correções 1 e 2): para cada status não-terminal, deve existir pelo
+--     menos uma aresta de saída na lista abaixo. DESCARTADO e ENCERRADO são
+--     terminais por desenho e ficam de fora desta lista de propósito.
+WITH estados_nao_terminais(status) AS (
+    VALUES ('NOVO'), ('AGUARDANDO_ANALISE'), ('AGUARDANDO_D1'), ('AGUARDANDO_APROVACAO'),
+           ('APROVADO'), ('REFAZER'), ('PRONTO_PARA_ENVIO'), ('ENVIADO'),
+           ('RESPONDEU'), ('SEM_RESPOSTA'), ('FOLLOWUP_PENDENTE')
+),
+arestas(de, para) AS (
+    VALUES ('NOVO','AGUARDANDO_ANALISE'), ('NOVO','AGUARDANDO_D1'), ('AGUARDANDO_ANALISE','AGUARDANDO_D1'),
+           ('AGUARDANDO_D1','AGUARDANDO_APROVACAO'), ('AGUARDANDO_APROVACAO','APROVADO'),
+           ('AGUARDANDO_APROVACAO','AGUARDANDO_APROVACAO'), ('AGUARDANDO_APROVACAO','REFAZER'),
+           ('AGUARDANDO_APROVACAO','DESCARTADO'), ('REFAZER','AGUARDANDO_APROVACAO'),
+           ('APROVADO','PRONTO_PARA_ENVIO'), ('PRONTO_PARA_ENVIO','ENVIADO'),
+           ('PRONTO_PARA_ENVIO','AGUARDANDO_APROVACAO'), ('ENVIADO','FOLLOWUP_PENDENTE'),
+           ('FOLLOWUP_PENDENTE','RESPONDEU'), ('FOLLOWUP_PENDENTE','SEM_RESPOSTA'),
+           ('RESPONDEU','ENCERRADO'), ('SEM_RESPOSTA','FOLLOWUP_PENDENTE'), ('SEM_RESPOSTA','ENCERRADO')
+)
+SELECT ent.status AS estado_sem_saida
+  FROM estados_nao_terminais ent
+ WHERE NOT EXISTS (SELECT 1 FROM arestas a WHERE a.de = ent.status);
+-- Esperado: 0 linhas. Esta consulta espelha exatamente a lista de arestas
+-- de transition_connection_status em 006_functions.sql — se divergir dali,
+-- corrigir a lista acima antes de reexecutar, não o inverso.
+
+-- 18) Roles: nenhuma role já existente com atributo administrativo
+--     divergente (informativo — 002_roles_and_schema.sql já aborta
+--     automaticamente se isso acontecer; esta consulta é só para inspeção
+--     manual antes de aplicar).
+SELECT rolname, rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication
+  FROM pg_roles
+ WHERE rolname IN ('n8n_rufino_linkedin_owner_dev', 'n8n_rufino_linkedin_dev');
+-- Esperado, se as roles já existirem antes de aplicar: owner com
+-- rolcanlogin=false e as demais colunas em false; app com rolcanlogin=true
+-- e as demais colunas em false. Se este SELECT retornar 0 linhas, as roles
+-- ainda não existem — 002 vai criá-las do zero, sem esta checagem se aplicar.
+
+-- 19) Role de aplicação não é membro da role owner (Correção 5 — herança de
+--     role quebraria o isolamento SECURITY DEFINER).
+SELECT r_member.rolname AS member, r_role.rolname AS of_role
+  FROM pg_auth_members m
+  JOIN pg_roles r_member ON r_member.oid = m.member
+  JOIN pg_roles r_role ON r_role.oid = m.roleid
+ WHERE r_member.rolname = 'n8n_rufino_linkedin_dev'
+   AND r_role.rolname = 'n8n_rufino_linkedin_owner_dev';
+-- Esperado: 0 linhas.

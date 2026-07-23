@@ -1,6 +1,12 @@
 -- =============================================================================
 -- 003_tables.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV)
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
+--
+-- Aplicar com: psql -v ON_ERROR_STOP=1 -f 003_tables.sql (ou \set ON_ERROR_STOP on
+-- antes, em sessão interativa) — sem isso, um erro no meio do arquivo não
+-- interrompe o psql, que segue tentando rodar os comandos seguintes dentro
+-- da mesma transação já abortada, produzindo uma cascata de erros confusos
+-- em vez de parar limpo no primeiro problema real.
 --
 -- As 8 tabelas canônicas do modelo operacional, no schema privado
 -- rufino_linkedin. Apenas colunas, tipos, defaults, PK e NOT NULL — foreign
@@ -41,6 +47,8 @@ CREATE TABLE rufino_linkedin.connections (
     pending_action_token_expires_at  timestamptz,
     active_edit_token_hash           text,
     active_edit_token_expires_at     timestamptz,
+    pending_regeneration_token_hash          text,
+    pending_regeneration_token_expires_at    timestamptz,
     created_at                       timestamptz NOT NULL DEFAULT now(),
     updated_at                       timestamptz NOT NULL DEFAULT now()
 );
@@ -53,6 +61,8 @@ COMMENT ON COLUMN rufino_linkedin.connections.pending_action_token_hash IS
     'SHA-256 (hex) do token de uso único para a próxima decisão por botão do Telegram (WF-03/WF-04). Nunca o valor bruto.';
 COMMENT ON COLUMN rufino_linkedin.connections.active_edit_token_hash IS
     'SHA-256 (hex) do link de edição ativo (WF-03-EDIT). Nunca o valor bruto.';
+COMMENT ON COLUMN rufino_linkedin.connections.pending_regeneration_token_hash IS
+    'SHA-256 (hex) do token de uso único emitido por approve_message (decisão REFAZER) e consumido por save_regenerated_message (v1.4.2). Nunca o valor bruto.';
 
 -- -----------------------------------------------------------------------------
 -- analyses
@@ -142,11 +152,15 @@ CREATE TABLE rufino_linkedin.followups (
     resultado        text,
     notified_actor   text,
     notes            text,
+    callback_query_id text,
     created_at       timestamptz NOT NULL DEFAULT now(),
     updated_at       timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE rufino_linkedin.followups OWNER TO n8n_rufino_linkedin_owner_dev;
+
+COMMENT ON COLUMN rufino_linkedin.followups.callback_query_id IS
+    'Id do callback_query do Telegram para a resposta RESPONDEU/SEM_RESPOSTA (v1.4.2) — dedupe de defesa em profundidade em complete_followup, mesma lógica de approvals/delivery_events.';
 
 -- -----------------------------------------------------------------------------
 -- workflow_errors
@@ -161,6 +175,7 @@ CREATE TABLE rufino_linkedin.workflow_errors (
     previous_status            text,
     recommended_resume_status  text,
     retry_count                integer     NOT NULL DEFAULT 0,
+    execution_id               text,
     resolved                   boolean     NOT NULL DEFAULT false,
     resolved_at                timestamptz,
     resolved_by                text,
@@ -172,6 +187,8 @@ ALTER TABLE rufino_linkedin.workflow_errors OWNER TO n8n_rufino_linkedin_owner_d
 
 COMMENT ON COLUMN rufino_linkedin.workflow_errors.context IS
     'jsonb livre para contexto do erro — nunca deve conter segredo, token bruto ou credencial.';
+COMMENT ON COLUMN rufino_linkedin.workflow_errors.execution_id IS
+    'Execution id do n8n (v1.4.2) — usado por record_workflow_error para idempotencia: a mesma execucao nao duplica o registro do mesmo erro nao resolvido.';
 
 -- -----------------------------------------------------------------------------
 -- connection_status_history (append-only)

@@ -1,11 +1,13 @@
 -- =============================================================================
 -- rollback/001_rollback.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — patch v1.4.1
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
+--
+-- Aplicar com: psql -v ON_ERROR_STOP=1 -f rollback/001_rollback.sql
 --
 -- Rollback irmão de 001–007 (007 é um stub documental desde a v1.4.1 — seu
 -- conteúdo de permissões vive dentro de 006, ver 007_function_permissions.sql).
 -- Ordem segura, inversa à ordem de criação:
---   1. Funções (as 9)               — sem risco de dado.
+--   1. Funções (as 11)              — sem risco de dado.
 --   2. Grants (EXECUTE/SELECT/USAGE) e policies de RLS.
 --   3. Tabelas dependentes de connections (nesta ordem entre si é livre,
 --      mas todas antes de connections).
@@ -46,11 +48,17 @@ DROP FUNCTION IF EXISTS rufino_linkedin.approve_message(
 DROP FUNCTION IF EXISTS rufino_linkedin.save_message_edit(
     text, text, text, text, text
 );
+DROP FUNCTION IF EXISTS rufino_linkedin.save_regenerated_message(
+    text, text, text, text, text
+);
 DROP FUNCTION IF EXISTS rufino_linkedin.mark_message_sent(
-    uuid, uuid, text, text, text, text, text, text
+    uuid, uuid, text, text, text, text, timestamptz, text, text
 );
 DROP FUNCTION IF EXISTS rufino_linkedin.claim_due_followups(
     integer
+);
+DROP FUNCTION IF EXISTS rufino_linkedin.complete_followup(
+    uuid, text, text, text, text, timestamptz, text, text
 );
 DROP FUNCTION IF EXISTS rufino_linkedin.record_workflow_error(
     uuid, text, text, text, jsonb, text, text, integer, text
