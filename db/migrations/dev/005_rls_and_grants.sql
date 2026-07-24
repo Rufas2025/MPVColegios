@@ -1,15 +1,21 @@
 -- =============================================================================
 -- 005_rls_and_grants.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
 --
 -- Aplicar com: psql -v ON_ERROR_STOP=1 -f 005_rls_and_grants.sql
 --
 -- Isolamento primário desta arquitetura: (1) schema rufino_linkedin privado,
 -- sem USAGE para PUBLIC; (2) grants mínimos — a role de aplicação só recebe
--- EXECUTE (nas 10 funções voltadas ao n8n, ver 006_functions.sql) e SELECT
--- (nas tabelas, aqui) — nunca INSERT/UPDATE/DELETE/TRUNCATE direto. RLS é
--- uma terceira camada de defesa (útil contra erro de configuração futuro),
--- não o mecanismo primário.
+-- EXECUTE (em 12 das 15 funções voltadas ao n8n, ver 006_functions.sql) e
+-- SELECT (nas tabelas, aqui) — nunca INSERT/UPDATE/DELETE/TRUNCATE direto.
+-- A role de aplicação também nunca recebe USAGE no schema extensions (v1.5.0,
+-- Correção 9 — reafirmado, sem mudança de comportamento). RLS é uma terceira
+-- camada de defesa (útil contra erro de configuração futuro), não o
+-- mecanismo primário.
+--
+-- v1.5.0: RLS/policies/grants estendidos às 3 tabelas novas (action_tokens,
+-- callback_receipts, notification_jobs) — mesma disciplina das 8 tabelas
+-- anteriores.
 --
 -- Não existe aqui nenhum conceito de "service_role"/Data API/Supavisor —
 -- este é PostgreSQL self-hosted no EasyPanel. O equivalente de risco a
@@ -51,9 +57,9 @@ GRANT USAGE ON SCHEMA rufino_linkedin TO n8n_rufino_linkedin_owner_dev;
 GRANT USAGE ON SCHEMA rufino_linkedin TO n8n_rufino_linkedin_dev;
 
 -- -----------------------------------------------------------------------------
--- RLS habilitado (não forçado) nas 8 tabelas — defesa adicional, não
+-- RLS habilitado (não forçado) nas 11 tabelas — defesa adicional, não
 -- primária. Sem FORCE: a role owner (dona das tabelas, NOLOGIN, só grava
--- através das 9 funções SECURITY DEFINER) continua isenta de RLS por
+-- através das funções SECURITY DEFINER) continua isenta de RLS por
 -- desenho — ver explicação no cabeçalho deste arquivo. RLS continua valendo
 -- para qualquer outra role, incluindo a de aplicação.
 -- -----------------------------------------------------------------------------
@@ -65,6 +71,9 @@ ALTER TABLE rufino_linkedin.delivery_events            ENABLE ROW LEVEL SECURITY
 ALTER TABLE rufino_linkedin.followups                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rufino_linkedin.workflow_errors            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rufino_linkedin.connection_status_history  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rufino_linkedin.action_tokens              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rufino_linkedin.callback_receipts          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rufino_linkedin.notification_jobs          ENABLE ROW LEVEL SECURITY;
 
 -- Policies USING (true) restritas por role — não é segmentação multi-tenant
 -- (não há multi-tenant dentro deste ambiente); existe para o caso de o
@@ -85,11 +94,17 @@ CREATE POLICY workflow_errors_select_app ON rufino_linkedin.workflow_errors
     FOR SELECT TO n8n_rufino_linkedin_dev USING (true);
 CREATE POLICY connection_status_history_select_app ON rufino_linkedin.connection_status_history
     FOR SELECT TO n8n_rufino_linkedin_dev USING (true);
+CREATE POLICY action_tokens_select_app ON rufino_linkedin.action_tokens
+    FOR SELECT TO n8n_rufino_linkedin_dev USING (true);
+CREATE POLICY callback_receipts_select_app ON rufino_linkedin.callback_receipts
+    FOR SELECT TO n8n_rufino_linkedin_dev USING (true);
+CREATE POLICY notification_jobs_select_app ON rufino_linkedin.notification_jobs
+    FOR SELECT TO n8n_rufino_linkedin_dev USING (true);
 
 -- -----------------------------------------------------------------------------
 -- Grants da role de aplicação: apenas SELECT. Nenhum INSERT/UPDATE/DELETE/
 -- TRUNCATE direto em nenhuma tabela — toda escrita operacional passa pelas
--- 10 funções voltadas ao n8n (ver 006_functions.sql). Sem DELETE em nenhuma
+-- funções voltadas ao n8n (ver 006_functions.sql). Sem DELETE em nenhuma
 -- tabela, por nenhuma role, no caminho operacional normal.
 -- -----------------------------------------------------------------------------
 GRANT SELECT ON
@@ -100,7 +115,10 @@ GRANT SELECT ON
     rufino_linkedin.delivery_events,
     rufino_linkedin.followups,
     rufino_linkedin.workflow_errors,
-    rufino_linkedin.connection_status_history
+    rufino_linkedin.connection_status_history,
+    rufino_linkedin.action_tokens,
+    rufino_linkedin.callback_receipts,
+    rufino_linkedin.notification_jobs
 TO n8n_rufino_linkedin_dev;
 
 COMMIT;

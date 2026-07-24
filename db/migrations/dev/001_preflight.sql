@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 001_preflight.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
 -- Ambiente: DEV — EasyPanel, projeto rufino-linkedin-dev, serviço n8n / linkedin-db
 --
 -- Aplicar com: psql -v ON_ERROR_STOP=1 -f 001_preflight.sql (vale para todos

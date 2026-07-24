@@ -1,20 +1,21 @@
 -- =============================================================================
 -- 004_constraints_and_indexes.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
 --
 -- Aplicar com: psql -v ON_ERROR_STOP=1 -f 004_constraints_and_indexes.sql
 --
--- Foreign keys, UNIQUE, CHECK e índices das 8 tabelas criadas em
+-- Foreign keys, UNIQUE, CHECK e índices das 11 tabelas criadas em
 -- 003_tables.sql. Nenhuma tabela fica "solta" sem estas garantias.
 --
--- ATOMICIDADE (fix v1.4.1, item 5): todo o arquivo roda dentro de uma única
--- transação — uma FK ou índice que falhar não deixa metade das constraints
--- aplicadas.
+-- ATOMICIDADE: todo o arquivo roda dentro de uma única transação.
 --
--- v1.4.2 (Correção 3): novos índices para as colunas/tabelas adicionadas
--- (regeneration token em connections, callback_query_id em followups,
--- execution_id em workflow_errors) e reformulação do índice parcial de
--- followups para cobrir também o ramo de claim abandonado.
+-- v1.5.0: índices/constraints das 3 tabelas novas (action_tokens,
+-- callback_receipts, notification_jobs); posse de claim em followups
+-- (claim_token_hash UNIQUE); índice UNIQUE parcial de idempotência por
+-- execution_id em workflow_errors (Correção 8 — substitui o par
+-- SELECT-depois-INSERT por INSERT...ON CONFLICT em 006_functions.sql).
+-- Removido o índice que não existe mais (pending_action_token_hash saiu de
+-- connections, ver 003_tables.sql).
 -- =============================================================================
 
 BEGIN;
@@ -30,12 +31,15 @@ ALTER TABLE rufino_linkedin.connections
         'RESPONDEU', 'SEM_RESPOSTA', 'FOLLOWUP_PENDENTE', 'ENCERRADO', 'ERRO'
     ));
 
+-- Ordenação determinística de claim_due_connections: (status, scheduled_at)
+-- cobre o filtro e a ordenação primária; connection_id como desempate final
+-- não precisa de índice próprio (poucas linhas empatam no mesmo instante).
 CREATE INDEX connections_status_scheduled_at_idx
     ON rufino_linkedin.connections (status, scheduled_at);
 CREATE INDEX connections_status_idx
     ON rufino_linkedin.connections (status);
 
--- v1.4.2: lookups por hash de token, usados por save_message_edit e
+-- Lookups por hash de token, usados por save_message_edit e
 -- save_regenerated_message (connection_id ainda não é conhecido nesses
 -- pontos — é resolvido a partir de qual linha tem o hash). Parciais porque
 -- a maioria das linhas tem esses campos NULL na maior parte do tempo.
@@ -91,7 +95,11 @@ ALTER TABLE rufino_linkedin.delivery_events
     ADD CONSTRAINT delivery_events_connection_id_fkey FOREIGN KEY (connection_id)
         REFERENCES rufino_linkedin.connections (connection_id) ON DELETE CASCADE,
     ADD CONSTRAINT delivery_events_delivery_mode_check CHECK (delivery_mode IN (
-        'MANUAL_ASSISTED', 'LINKEDIN_MESSAGES_API_APPROVED'
+        'MANUAL_ASSISTED'
+        -- v1.5.0 (Correção 9): LINKEDIN_MESSAGES_API_APPROVED removido do
+        -- CHECK enquanto o adaptador não estiver de fato implementado — ver
+        -- references/linkedin-api-readiness.md. Reintroduzir aqui é o
+        -- próprio ato de habilitar o adaptador futuro, não antes.
     )),
     ADD CONSTRAINT delivery_events_callback_query_id_key UNIQUE (callback_query_id);
 
@@ -108,13 +116,16 @@ ALTER TABLE rufino_linkedin.followups
         resultado IS NULL OR resultado IN ('RESPONDEU', 'SEM_RESPOSTA')
     ),
     ADD CONSTRAINT followups_connection_sequence_key UNIQUE (connection_id, sequence),
-    ADD CONSTRAINT followups_callback_query_id_key UNIQUE (callback_query_id);
+    ADD CONSTRAINT followups_callback_query_id_key UNIQUE (callback_query_id),
+    -- v1.5.0 (Correção 6): posse de claim por hash — no máximo uma linha
+    -- pode ter um dado claim_token_hash vivo por vez (rotacionado a cada
+    -- claim/reclaim, nulo entre reivindicações).
+    ADD CONSTRAINT followups_claim_token_hash_key UNIQUE (claim_token_hash);
 
--- v1.4.2: o índice parcial passa a ser sobre executed_at IS NULL (não mais
--- claimed_at IS NULL) — claim_due_followups agora reivindica tanto linhas
--- nunca reivindicadas quanto claims abandonados (claimed_at antigo), e o
--- filtro comum aos dois ramos é sempre executed_at IS NULL; claimed_at é
--- avaliado em memória sobre o conjunto já reduzido por este índice.
+-- O índice parcial permanece sobre executed_at IS NULL — claim_due_followups
+-- reivindica tanto linhas nunca reivindicadas quanto claims expirados
+-- (claim_expires_at no passado); o filtro comum aos dois ramos é sempre
+-- executed_at IS NULL.
 CREATE INDEX followups_scheduled_for_pending_idx
     ON rufino_linkedin.followups (scheduled_for) WHERE executed_at IS NULL;
 CREATE INDEX followups_connection_id_idx ON rufino_linkedin.followups (connection_id);
@@ -130,10 +141,17 @@ CREATE INDEX workflow_errors_source_workflow_resolved_idx
     ON rufino_linkedin.workflow_errors (source_workflow, resolved);
 CREATE INDEX workflow_errors_connection_id_idx ON rufino_linkedin.workflow_errors (connection_id);
 
--- v1.4.2 (Correção 4): apoia a checagem de idempotência por execution_id em
--- record_workflow_error. Parcial porque execution_id é opcional.
-CREATE INDEX workflow_errors_execution_id_idx
-    ON rufino_linkedin.workflow_errors (execution_id, source_workflow, error_type) WHERE execution_id IS NOT NULL;
+-- v1.5.0 (Correção 8): chave de idempotência real — uma única linha não
+-- resolvida por (connection_id, source_workflow, error_type, execution_id)
+-- quando execution_id é informado. NULLS NOT DISTINCT (PostgreSQL 15+)
+-- trata connection_id NULL de forma consistente (erros não amarrados a
+-- conexão também deduplicam por execution_id). record_workflow_error usa
+-- este índice via INSERT...ON CONFLICT — nunca mais SELECT seguido de
+-- INSERT para decidir se já existe.
+CREATE UNIQUE INDEX workflow_errors_execution_dedupe_key
+    ON rufino_linkedin.workflow_errors (connection_id, source_workflow, error_type, execution_id)
+    NULLS NOT DISTINCT
+    WHERE execution_id IS NOT NULL AND resolved = false;
 
 -- -----------------------------------------------------------------------------
 -- connection_status_history
@@ -144,5 +162,61 @@ ALTER TABLE rufino_linkedin.connection_status_history
 
 CREATE INDEX connection_status_history_connection_id_created_at_idx
     ON rufino_linkedin.connection_status_history (connection_id, created_at);
+
+-- -----------------------------------------------------------------------------
+-- action_tokens (v1.5.0)
+-- -----------------------------------------------------------------------------
+ALTER TABLE rufino_linkedin.action_tokens
+    ADD CONSTRAINT action_tokens_connection_id_fkey FOREIGN KEY (connection_id)
+        REFERENCES rufino_linkedin.connections (connection_id) ON DELETE CASCADE,
+    ADD CONSTRAINT action_tokens_message_version_id_fkey FOREIGN KEY (message_version_id)
+        REFERENCES rufino_linkedin.message_versions (message_version_id) ON DELETE CASCADE,
+    ADD CONSTRAINT action_tokens_scope_check CHECK (scope IN ('APPROVAL', 'DELIVERY')),
+    ADD CONSTRAINT action_tokens_token_hash_key UNIQUE (token_hash);
+
+-- Usado por issue_action_token para invalidar tokens anteriores ainda
+-- ativos da mesma conexão+scope antes de emitir um novo.
+CREATE INDEX action_tokens_connection_scope_active_idx
+    ON rufino_linkedin.action_tokens (connection_id, scope) WHERE consumed_at IS NULL;
+
+-- -----------------------------------------------------------------------------
+-- callback_receipts (v1.5.0)
+-- -----------------------------------------------------------------------------
+-- callback_query_id já é PK (003_tables.sql) — nenhuma constraint adicional
+-- necessária. Índice por operação, útil para auditoria/depuração manual.
+CREATE INDEX callback_receipts_operation_idx ON rufino_linkedin.callback_receipts (operation);
+
+-- -----------------------------------------------------------------------------
+-- notification_jobs (v1.5.0)
+-- -----------------------------------------------------------------------------
+ALTER TABLE rufino_linkedin.notification_jobs
+    ADD CONSTRAINT notification_jobs_connection_id_fkey FOREIGN KEY (connection_id)
+        REFERENCES rufino_linkedin.connections (connection_id) ON DELETE CASCADE,
+    ADD CONSTRAINT notification_jobs_message_version_id_fkey FOREIGN KEY (message_version_id)
+        REFERENCES rufino_linkedin.message_versions (message_version_id) ON DELETE CASCADE,
+    ADD CONSTRAINT notification_jobs_job_type_check CHECK (job_type IN ('APPROVAL', 'DELIVERY')),
+    ADD CONSTRAINT notification_jobs_status_check CHECK (status IN (
+        'PENDING', 'CLAIMED', 'DELIVERED', 'SUPERSEDED'
+    )),
+    -- Rotacionado a cada claim/reclaim — no máximo uma linha pode ter um
+    -- dado claim_token_hash vivo por vez.
+    ADD CONSTRAINT notification_jobs_claim_token_hash_key UNIQUE (claim_token_hash),
+    -- Backstop estrutural: impede duas linhas PENDING (ou duas CLAIMED)
+    -- simultâneas para o mesmo par conexão+tipo — o caso mais provável de
+    -- duplicação acidental (ex.: create_notification_job chamada duas vezes
+    -- sem superar a anterior). Não cobre toda combinação PENDING+CLAIMED
+    -- coexistindo (status diferentes não colidem neste UNIQUE); essa
+    -- coexistência é evitada proceduralmente: create_notification_job sempre
+    -- marca SUPERSEDED qualquer job não entregue da mesma conexão+tipo
+    -- antes de inserir o novo PENDING, na mesma transação.
+    ADD CONSTRAINT notification_jobs_active_per_connection_type_key
+        UNIQUE (connection_id, job_type, status);
+
+-- Consulta central de claim_notification_jobs: jobs pendentes ou com claim
+-- expirado, nunca DELIVERED nem SUPERSEDED.
+CREATE INDEX notification_jobs_claimable_idx
+    ON rufino_linkedin.notification_jobs (status, claim_expires_at)
+    WHERE status IN ('PENDING', 'CLAIMED');
+CREATE INDEX notification_jobs_connection_id_idx ON rufino_linkedin.notification_jobs (connection_id);
 
 COMMIT;

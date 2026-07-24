@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 002_roles_and_schema.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.4.2
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
 --
 -- Aplicar com: psql -v ON_ERROR_STOP=1 -f 002_roles_and_schema.sql
 --
