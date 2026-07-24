@@ -1,6 +1,6 @@
-# 010_concurrency_tests.md — Testes de concorrência real (v1.5.0)
+# 010_concurrency_tests.md — Testes de concorrência real e retry atrasado real (v1.5.0/v1.5.1)
 
-Este documento e os scripts em `tests/` **não fazem parte da migration de produção** (001–009) — existem para provar, com concorrência genuína entre duas conexões PostgreSQL reais (não simulada dentro de uma única sessão), os invariantes de concorrência que `009_smoke_tests.sql` não consegue exercitar sozinho (uma única sessão, uma única transação, nunca duas transações reais correndo ao mesmo tempo).
+Este documento e os scripts em `tests/` **não fazem parte da migration de produção** (001–009) — existem para provar, com concorrência genuína entre duas conexões PostgreSQL reais e com passagem real de tempo de parede (nenhuma das duas coisas é simulável dentro de uma única transação), os invariantes que `009_smoke_tests.sql` não consegue exercitar sozinho (uma única sessão, uma única transação, `now()` estável do início ao fim, nunca duas transações reais correndo ao mesmo tempo, nunca um `COMMIT` real entre duas chamadas).
 
 Rodam contra um banco descartável — **nunca contra o banco real `rufino-linkedin-dev`**. São entregues no ZIP desta migration para auditoria e reexecução independente, não para aplicação em DEV/PROD.
 
@@ -24,19 +24,32 @@ Rodam contra um banco descartável — **nunca contra o banco real `rufino-linke
 
 **Resultado real desta rodada**: Sessão 1 reivindicou 0 jobs; Sessão 2 reivindicou os 2 jobs de teste — conjuntos disjuntos, nenhuma duplicação. Ver `TEST-REPORT.md`.
 
+## Teste 3 — Retry atrasado real de `mark_message_sent`/`complete_followup` (v1.5.1, Correção 3)
+
+**Scripts:** `tests/delayed_retry_mark_message_sent.sql`, `tests/delayed_retry_complete_followup.sql`, orquestrados por `tests/run_delayed_retry_tests.sh`.
+
+**Por que isso também não cabe em `009_smoke_tests.sql`:** o bug corrigido nesta rodada era `mark_message_sent`/`complete_followup` validando `p_first_followup_at`/`p_next_followup_at` como data futura **antes** de checar `callback_receipts` — um retry legítimo (reentrega do Telegram, por exemplo) que chegasse depois que a data agendada já tivesse passado de verdade era rejeitado por engano, mesmo sendo um callback já processado com sucesso. Provar isso exige que a data realmente passe entre a primeira chamada e o retry — e `now()` não muda dentro de uma transação só, então isso é inexercitável em `009_smoke_tests.sql` (`BEGIN...ROLLBACK`, uma transação, do início ao fim). Cada script roda em modo autocommit (sem `BEGIN` explícito): monta a conexão até o ponto certo, faz a primeira chamada com uma data poucos segundos no futuro, **commita de verdade**, espera com `pg_sleep` até a data passar de verdade, e só então faz o retry com o **mesmo** `callback_query_id` e o **mesmo** valor literal de data (nunca recalculado — um valor recalculado teria um fingerprint diferente e seria tratado, corretamente, como conflito, não como retry).
+
+**O que prova:** o retry, mesmo com a data já no passado, devolve exatamente o mesmo resultado da primeira chamada (mesmo `delivery_event_id`/`followup_id`/status, ou mesmo `next_followup_id`/sequência) e não duplica nenhuma linha em `delivery_events`/`followups`. Cada script se autovalida (bloco `DO $verify$ ... RAISE EXCEPTION` em caso de divergência) e limpa os próprios dados ao final — como usam `COMMIT` real (não `ROLLBACK`), a limpeza é `DELETE` explícito, mesma disciplina do Teste 1/2 acima.
+
+**Resultado real desta rodada:** ambos os retries devolveram resultado idêntico ao da primeira chamada, sem duplicar nada. Ver `TEST-REPORT-v1.5.1.md` para o log completo.
+
 ## Como rodar
 
 ```bash
 cd db/migrations/dev
 PGDATABASE=rufino-linkedin-dev bash tests/run_concurrency_tests.sh
+PGDATABASE=rufino-linkedin-dev bash tests/run_delayed_retry_tests.sh
 ```
 
-O script orquestrador (`tests/run_concurrency_tests.sh`):
+O script orquestrador `tests/run_concurrency_tests.sh`:
 1. Roda o Teste 1 (duas sessões `psql` em background, sincronizadas por `pg_sleep`), depois confirma via consulta direta que os dois `retry_count` gravados são distintos e sequenciais.
 2. Roda o Teste 2 (setup + duas sessões `psql` verdadeiramente concorrentes via `&`/`wait`), depois confirma que os conjuntos de UUIDs reivindicados por cada sessão não se sobrepõem.
 3. Limpa os dados de teste ao final (`DELETE` explícito — estes dois testes usam `COMMIT`, não `ROLLBACK`, porque a prova de serialização exige transações que realmente terminem para uma liberar o lock para a outra; por isso a limpeza é manual e explícita, não automática como em `009_smoke_tests.sql`).
 
-**Pré-requisito:** a migration 001–006 já aplicada no banco de destino (o mesmo banco descartável usado para `009_smoke_tests.sql`).
+O script orquestrador `tests/run_delayed_retry_tests.sh` roda o Teste 3 (os dois scripts de retry atrasado, um de cada vez — não há concorrência aqui, só passagem real de tempo, então não há necessidade de rodá-los em paralelo).
+
+**Pré-requisito:** a migration 001–007 já aplicada no banco de destino (o mesmo banco descartável usado para `009_smoke_tests.sql`).
 
 ## Reclaim sob concorrência real (nota)
 

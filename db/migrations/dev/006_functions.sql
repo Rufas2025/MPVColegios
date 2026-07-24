@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 006_functions.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.1
 --
 -- Aplicar com: psql -v ON_ERROR_STOP=1 -f 006_functions.sql
 --
@@ -58,6 +58,31 @@
 -- persistido, inclusive depois de o token original já ter sido consumido.
 -- Mesmo callback_query_id + conteúdo diferente falha claramente (conflito,
 -- nunca sobrescreve).
+--
+-- CORREÇÕES v1.5.1 (nenhuma mudança de assinatura pública — ver
+-- N8N-INTEGRATION.md, que permanece válido tal como está):
+--   1. approve_message NUNCA mais persiste raw_edit_token/
+--      raw_regeneration_token dentro de callback_receipts.result — o
+--      receipt guarda só approval_id/connection_id/decision/new_status/
+--      continuation ('EDIT'/'REGENERATE'/'NONE'). Um retry cujo continuation
+--      seja EDIT ou REGENERATE, com a conexão ainda no status esperado
+--      (AGUARDANDO_APROVACAO ou REFAZER, respectivamente), gera e devolve um
+--      token NOVO, rotacionando o hash atomicamente — sem repetir a decisão
+--      de negócio (sem novo approval/histórico/transição/versão). Se o
+--      fluxo já avançou, os tokens de continuação voltam NULL.
+--   2. notification_jobs_active_per_connection_type_key (UNIQUE sobre
+--      connection_id, job_type, status) foi substituída por um índice
+--      UNIQUE parcial (ver 004_constraints_and_indexes.sql) que só proíbe
+--      dois jobs ATIVOS (PENDING/CLAIMED) simultâneos por conexão/tipo —
+--      qualquer quantidade de linhas DELIVERED/SUPERSEDED históricas passa
+--      a ser permitida, cobrindo o ciclo real de apresentar → editar/refazer
+--      → apresentar de novo.
+--   3. mark_message_sent e complete_followup agora checam callback_receipts
+--      (por callback_query_id/fingerprint) ANTES de validar que
+--      p_first_followup_at/p_next_followup_at é uma data futura — um retry
+--      legítimo, chegando depois que a data original já passou, encontra o
+--      receipt e devolve o resultado persistido sem reavaliar a checagem de
+--      tempo, que só se aplica à primeira chamada.
 --
 -- Callback_data compacto (Telegram): os tokens usados em action_tokens e
 -- em followups.claim_token_hash são gerados com 24 bytes aleatórios (48
@@ -668,6 +693,8 @@ DECLARE
     v_current_version_id      uuid;
     v_approval_id             uuid;
     v_new_status              text;
+    v_continuation            text;
+    v_current_status          text;
     v_raw_edit_token          text;
     v_edit_hash               text;
     v_raw_regeneration_token  text;
@@ -696,11 +723,66 @@ BEGIN
             RAISE EXCEPTION 'approve_message: callback_query_id % ja processado com conteudo diferente', p_callback_query_id;
         END IF;
 
+        -- [v1.5.1, Correcao 1] O receipt nunca guarda token bruto -- so
+        -- approval_id/connection_id/decision/new_status/continuation.
+        -- Quando a decisao original exigia um token de continuacao
+        -- (EDITAR -> edit_token, REFAZER -> regeneration_token), o token
+        -- em si nao sobrevive ao primeiro retorno (nunca foi persistido
+        -- bruto), entao um retry legitimo precisa de um token NOVO para
+        -- continuar sendo utilizavel -- gerado aqui, rotacionando o hash
+        -- atomicamente, sem repetir a decisao de negocio (sem novo
+        -- approval, sem nova transicao, sem novo historico). Se o fluxo
+        -- ja avancou para alem do estado esperado (o token de continuacao
+        -- anterior ja foi de fato usado por outra chamada), os tokens de
+        -- continuacao voltam nulos -- o retry ainda e idempotente, so que
+        -- sem nada mais para continuar.
+        SELECT
+            (v_existing.result->>'approval_id')::uuid,
+            (v_existing.result->>'connection_id')::uuid,
+            v_existing.result->>'new_status',
+            v_existing.result->>'continuation'
+          INTO v_approval_id, v_connection_id, v_new_status, v_continuation;
+
+        v_raw_edit_token := NULL;
+        v_raw_regeneration_token := NULL;
+        v_regeneration_expires := NULL;
+
+        IF v_continuation = 'EDIT' THEN
+            SELECT c.status INTO v_current_status
+              FROM rufino_linkedin.connections c
+             WHERE c.connection_id = v_connection_id
+               FOR UPDATE;
+
+            IF v_current_status = 'AGUARDANDO_APROVACAO' THEN
+                v_raw_edit_token := encode(extensions.gen_random_bytes(32), 'hex');
+                v_edit_hash := encode(extensions.digest(v_raw_edit_token, 'sha256'), 'hex');
+                UPDATE rufino_linkedin.connections
+                   SET active_edit_token_hash = v_edit_hash,
+                       active_edit_token_expires_at = now() + interval '2 days',
+                       updated_at = now()
+                 WHERE rufino_linkedin.connections.connection_id = v_connection_id;
+            END IF;
+        ELSIF v_continuation = 'REGENERATE' THEN
+            SELECT c.status INTO v_current_status
+              FROM rufino_linkedin.connections c
+             WHERE c.connection_id = v_connection_id
+               FOR UPDATE;
+
+            IF v_current_status = 'REFAZER' THEN
+                v_raw_regeneration_token := encode(extensions.gen_random_bytes(32), 'hex');
+                v_regeneration_hash := encode(extensions.digest(v_raw_regeneration_token, 'sha256'), 'hex');
+                v_regeneration_expires := now() + interval '2 days';
+                UPDATE rufino_linkedin.connections
+                   SET pending_regeneration_token_hash = v_regeneration_hash,
+                       pending_regeneration_token_expires_at = v_regeneration_expires,
+                       updated_at = now()
+                 WHERE rufino_linkedin.connections.connection_id = v_connection_id;
+            END IF;
+        END IF;
+
         RETURN QUERY
-        SELECT * FROM jsonb_to_record(v_existing.result) AS x(
-            approval_id uuid, connection_id uuid, decision text, new_status text,
-            raw_edit_token text, raw_regeneration_token text, regeneration_token_expires_at timestamptz
-        );
+        SELECT v_approval_id, v_connection_id, p_decision, v_new_status,
+               v_raw_edit_token, v_raw_regeneration_token, v_regeneration_expires;
         RETURN;
     END IF;
 
@@ -780,14 +862,19 @@ BEGIN
          WHERE rufino_linkedin.connections.connection_id = v_connection_id;
     END IF;
 
+    -- [v1.5.1, Correcao 1] Nunca persistir token bruto no receipt -- so o
+    -- indicador de qual continuacao (se alguma) este callback abriu, para
+    -- que um retry saiba se deve emitir um token novo (ver ramo FOUND acima).
     v_result := jsonb_build_object(
         'approval_id', v_approval_id,
         'connection_id', v_connection_id,
         'decision', p_decision,
         'new_status', v_new_status,
-        'raw_edit_token', v_raw_edit_token,
-        'raw_regeneration_token', v_raw_regeneration_token,
-        'regeneration_token_expires_at', v_regeneration_expires
+        'continuation', CASE
+            WHEN p_decision = 'EDITAR' THEN 'EDIT'
+            WHEN p_decision = 'REFAZER' THEN 'REGENERATE'
+            ELSE 'NONE'
+        END
     );
 
     INSERT INTO rufino_linkedin.callback_receipts (callback_query_id, operation, fingerprint, result)
@@ -1020,15 +1107,6 @@ BEGIN
         RAISE EXCEPTION 'mark_message_sent: acao invalida "%"', p_action;
     END IF;
 
-    IF p_action = 'MARCAR_ENVIADA' THEN
-        IF p_first_followup_at IS NULL THEN
-            RAISE EXCEPTION 'mark_message_sent: p_first_followup_at obrigatorio quando p_action=MARCAR_ENVIADA';
-        END IF;
-        IF p_first_followup_at <= now() THEN
-            RAISE EXCEPTION 'mark_message_sent: p_first_followup_at precisa ser uma data futura (recebido: %)', p_first_followup_at;
-        END IF;
-    END IF;
-
     v_token_hash := encode(extensions.digest(p_action_token, 'sha256'), 'hex');
     v_fingerprint := encode(extensions.digest(
         'mark_message_sent:' || p_action || ':' || v_token_hash || ':' || COALESCE(p_first_followup_at::text, ''),
@@ -1050,6 +1128,22 @@ BEGIN
             delivery_event_id uuid, connection_id uuid, new_status text, followup_id uuid
         );
         RETURN;
+    END IF;
+
+    -- [v1.5.1, Correcao 3] So valida a regra de negocio dependente de
+    -- "agora" (p_first_followup_at futuro) depois de confirmar que este
+    -- callback_query_id nunca foi processado -- um retry legitimo, com o
+    -- mesmo fingerprint, ja teria retornado acima sem chegar aqui. Isso
+    -- evita que um retry atrasado (ex.: reentrega do Telegram depois que
+    -- a data original ja passou) seja rejeitado por uma checagem de
+    -- tempo que so faz sentido na primeira chamada.
+    IF p_action = 'MARCAR_ENVIADA' THEN
+        IF p_first_followup_at IS NULL THEN
+            RAISE EXCEPTION 'mark_message_sent: p_first_followup_at obrigatorio quando p_action=MARCAR_ENVIADA';
+        END IF;
+        IF p_first_followup_at <= now() THEN
+            RAISE EXCEPTION 'mark_message_sent: p_first_followup_at precisa ser uma data futura (recebido: %)', p_first_followup_at;
+        END IF;
     END IF;
 
     SELECT at.connection_id, at.message_version_id, at.expires_at, at.consumed_at
@@ -1281,14 +1375,6 @@ BEGIN
         RAISE EXCEPTION 'complete_followup: resultado invalido "%"', p_resultado;
     END IF;
 
-    IF p_resultado = 'RESPONDEU' AND p_next_followup_at IS NOT NULL THEN
-        RAISE EXCEPTION 'complete_followup: p_next_followup_at nao se aplica quando resultado=RESPONDEU';
-    END IF;
-
-    IF p_next_followup_at IS NOT NULL AND p_next_followup_at <= now() THEN
-        RAISE EXCEPTION 'complete_followup: p_next_followup_at precisa ser uma data futura (recebido: %)', p_next_followup_at;
-    END IF;
-
     v_token_hash := encode(extensions.digest(p_claim_token, 'sha256'), 'hex');
     v_fingerprint := encode(extensions.digest(
         'complete_followup:' || p_resultado || ':' || v_token_hash || ':' || COALESCE(p_next_followup_at::text, ''),
@@ -1311,6 +1397,18 @@ BEGIN
             next_followup_id uuid, next_followup_sequence integer, next_followup_scheduled_for timestamptz
         );
         RETURN;
+    END IF;
+
+    -- [v1.5.1, Correcao 3] Validacoes dependentes de "agora" (data futura)
+    -- e da combinacao resultado/p_next_followup_at so acontecem depois de
+    -- confirmar que este callback_query_id nunca foi processado -- um
+    -- retry legitimo com o mesmo fingerprint ja teria retornado acima.
+    IF p_resultado = 'RESPONDEU' AND p_next_followup_at IS NOT NULL THEN
+        RAISE EXCEPTION 'complete_followup: p_next_followup_at nao se aplica quando resultado=RESPONDEU';
+    END IF;
+
+    IF p_next_followup_at IS NOT NULL AND p_next_followup_at <= now() THEN
+        RAISE EXCEPTION 'complete_followup: p_next_followup_at precisa ser uma data futura (recebido: %)', p_next_followup_at;
     END IF;
 
     SELECT f.followup_id, f.connection_id, f.claim_expires_at, f.executed_at

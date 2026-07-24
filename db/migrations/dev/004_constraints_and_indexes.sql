@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 004_constraints_and_indexes.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.1
 --
 -- Aplicar com: psql -v ON_ERROR_STOP=1 -f 004_constraints_and_indexes.sql
 --
@@ -16,6 +16,12 @@
 -- SELECT-depois-INSERT por INSERT...ON CONFLICT em 006_functions.sql).
 -- Removido o índice que não existe mais (pending_action_token_hash saiu de
 -- connections, ver 003_tables.sql).
+--
+-- v1.5.1 (Correção 2): notification_jobs_active_per_connection_type_key
+-- (UNIQUE (connection_id, job_type, status)) substituída por um índice
+-- UNIQUE parcial (connection_id, job_type) WHERE status IN ('PENDING',
+-- 'CLAIMED') — a constraint antiga bloqueava indevidamente uma segunda
+-- linha DELIVERED ou SUPERSEDED histórica para a mesma conexão/tipo.
 -- =============================================================================
 
 BEGIN;
@@ -200,17 +206,23 @@ ALTER TABLE rufino_linkedin.notification_jobs
     )),
     -- Rotacionado a cada claim/reclaim — no máximo uma linha pode ter um
     -- dado claim_token_hash vivo por vez.
-    ADD CONSTRAINT notification_jobs_claim_token_hash_key UNIQUE (claim_token_hash),
-    -- Backstop estrutural: impede duas linhas PENDING (ou duas CLAIMED)
-    -- simultâneas para o mesmo par conexão+tipo — o caso mais provável de
-    -- duplicação acidental (ex.: create_notification_job chamada duas vezes
-    -- sem superar a anterior). Não cobre toda combinação PENDING+CLAIMED
-    -- coexistindo (status diferentes não colidem neste UNIQUE); essa
-    -- coexistência é evitada proceduralmente: create_notification_job sempre
-    -- marca SUPERSEDED qualquer job não entregue da mesma conexão+tipo
-    -- antes de inserir o novo PENDING, na mesma transação.
-    ADD CONSTRAINT notification_jobs_active_per_connection_type_key
-        UNIQUE (connection_id, job_type, status);
+    ADD CONSTRAINT notification_jobs_claim_token_hash_key UNIQUE (claim_token_hash);
+
+-- [v1.5.1, Correção 2] Backstop estrutural: no máximo um job *ativo*
+-- (PENDING ou CLAIMED) por conexão/tipo — nunca dois jobs simultâneos
+-- disputando o mesmo par connection_id+job_type. Um índice UNIQUE parcial,
+-- não uma constraint UNIQUE cobrindo a coluna status inteira: a versão
+-- anterior (`notification_jobs_active_per_connection_type_key UNIQUE
+-- (connection_id, job_type, status)`) impedia, incorretamente, uma
+-- segunda linha DELIVERED ou uma segunda linha SUPERSEDED para a mesma
+-- conexão+tipo — o que quebra o fluxo real de "apresentar, editar/refazer,
+-- apresentar de novo", que gera múltiplas notificações APPROVAL/DELIVERY
+-- históricas para a mesma conexão ao longo do tempo. Quantidade de linhas
+-- DELIVERED e SUPERSEDED por conexão/tipo é sempre ilimitada; só o job
+-- ativo (ainda não entregue) precisa ser único.
+CREATE UNIQUE INDEX notification_jobs_one_active_per_connection_type_idx
+    ON rufino_linkedin.notification_jobs (connection_id, job_type)
+    WHERE status IN ('PENDING', 'CLAIMED');
 
 -- Consulta central de claim_notification_jobs: jobs pendentes ou com claim
 -- expirado, nunca DELIVERED nem SUPERSEDED.

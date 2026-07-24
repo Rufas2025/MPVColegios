@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 009_smoke_tests.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.1
 --
 -- Aplicar com: psql -v ON_ERROR_STOP=1 -f 009_smoke_tests.sql
 --
@@ -32,9 +32,17 @@
 -- dentro de um bloco DO — não é sintaxe válida ali.
 --
 -- "Não declarar que os smoke tests foram executados" além do que
--- realmente rodou nesta sessão: ver TEST-REPORT.md para o registro da
--- execução real contra PostgreSQL 16.13 descartável (não 17 — indisponível
--- neste ambiente, ver TEST-REPORT.md seção "Desvio de ambiente").
+-- realmente rodou nesta sessão: ver TEST-REPORT-v1.5.1.md para o registro
+-- da execução real contra PostgreSQL 16.13 descartável (não 17 —
+-- indisponível neste ambiente, ver seção "Desvio de ambiente").
+--
+-- v1.5.1: itens novos [22b]/[22c] (retry de approve_message/EDITAR não
+-- vaza raw_edit_token e devolve token novo e utilizável), [23b]/[23c]
+-- (idem para REFAZER/raw_regeneration_token), [24b] (outbox aceita 2 jobs
+-- APPROVAL DELIVERED históricos para a mesma conexão — Correção 2).
+-- O retry atrasado real (Correção 3) não cabe aqui — now() é estável
+-- dentro de uma transação — ver tests/run_delayed_retry_tests.sh.
+-- Prefixo de idempotency_key destes itens: "smoketest-v151-<cenario>".
 -- =============================================================================
 
 BEGIN;
@@ -1084,10 +1092,15 @@ DECLARE
     v_raw_action text;
     v_raw_claim text;
     v_raw_edit text;
+    v_raw_edit_retry text;
     v_status_after text;
     v_mv_id uuid;
     v_version integer;
     v_job_count integer;
+    v_approval_count_before integer;
+    v_approval_count_after integer;
+    v_history_count_before integer;
+    v_history_count_after integer;
 BEGIN
     PERFORM c.connection_id FROM rufino_linkedin.claim_due_connections(1) c;
     SELECT nj.raw_action_token, nj.raw_claim_token INTO v_raw_action, v_raw_claim
@@ -1101,8 +1114,44 @@ BEGIN
         RAISE EXCEPTION 'SMOKE FALHOU [22]: approve_message(EDITAR) deveria manter AGUARDANDO_APROVACAO e emitir edit_token (status=%, token=%)', v_status_after, v_raw_edit;
     END IF;
 
+    -- [v1.5.1, Correção 1] O receipt persistido para este callback_query_id
+    -- nunca pode conter o token bruto -- nem como chave raw_edit_token, nem
+    -- como valor de texto escondido sob outra chave.
+    PERFORM 1 FROM rufino_linkedin.callback_receipts
+     WHERE callback_query_id = 'smoketest-cbq-editar'
+       AND (result ? 'raw_edit_token' OR result::text LIKE '%' || v_raw_edit || '%');
+    IF FOUND THEN
+        RAISE EXCEPTION 'SMOKE FALHOU [22]: raw_edit_token vazou para dentro de callback_receipts.result';
+    END IF;
+    RAISE NOTICE 'SMOKE OK [22b]: raw_edit_token nao aparece em callback_receipts.result (nem como chave, nem como valor bruto)';
+
+    -- [v1.5.1, Correção 1] Retry do mesmo callback_query_id: idempotente
+    -- quanto a negocio (nenhum novo approval/historico), mas como a decisao
+    -- foi EDITAR e a conexao ainda esta em AGUARDANDO_APROVACAO, devolve um
+    -- edit_token NOVO e utilizavel -- o anterior nunca sobrevive ao retry
+    -- porque nunca foi persistido bruto em lugar nenhum.
+    SELECT count(*) INTO v_approval_count_before FROM rufino_linkedin.approvals WHERE connection_id = v_connection_id;
+    SELECT count(*) INTO v_history_count_before FROM rufino_linkedin.connection_status_history WHERE connection_id = v_connection_id;
+
+    SELECT r.new_status, r.raw_edit_token INTO v_status_after, v_raw_edit_retry
+      FROM rufino_linkedin.approve_message(v_raw_action, 'EDITAR', 'telegram:anderson', 'smoketest-cbq-editar') r;
+
+    SELECT count(*) INTO v_approval_count_after FROM rufino_linkedin.approvals WHERE connection_id = v_connection_id;
+    SELECT count(*) INTO v_history_count_after FROM rufino_linkedin.connection_status_history WHERE connection_id = v_connection_id;
+
+    IF v_approval_count_after <> v_approval_count_before OR v_history_count_after <> v_history_count_before THEN
+        RAISE EXCEPTION 'SMOKE FALHOU [22]: retry de approve_message(EDITAR) duplicou approval ou historico (approvals % -> %, historico % -> %)',
+            v_approval_count_before, v_approval_count_after, v_history_count_before, v_history_count_after;
+    END IF;
+
+    IF v_raw_edit_retry IS NULL OR v_raw_edit_retry = v_raw_edit THEN
+        RAISE EXCEPTION 'SMOKE FALHOU [22]: retry deveria devolver um edit_token NOVO e nao-nulo (obtido %)', v_raw_edit_retry;
+    END IF;
+
+    RAISE NOTICE 'SMOKE OK [22c]: retry de approve_message(EDITAR) nao duplica approval/historico e devolve edit_token novo e utilizavel';
+
     SELECT r.connection_id, r.message_version_id, r.version INTO v_connection_id, v_mv_id, v_version
-      FROM rufino_linkedin.save_message_edit(v_raw_edit, 'Mensagem editada manualmente por Anderson.', 'anderson') r;
+      FROM rufino_linkedin.save_message_edit(v_raw_edit_retry, 'Mensagem editada manualmente por Anderson.', 'anderson') r;
 
     IF v_version <> 2 THEN
         RAISE EXCEPTION 'SMOKE FALHOU [22]: save_message_edit deveria criar version=2 (obtido %)', v_version;
@@ -1155,11 +1204,16 @@ DECLARE
     v_raw_action text;
     v_raw_claim text;
     v_raw_regen text;
+    v_raw_regen_retry text;
     v_status_after text;
     v_mv_id uuid;
     v_version integer;
     v_job_count integer;
     v_rejected boolean;
+    v_approval_count_before integer;
+    v_approval_count_after integer;
+    v_history_count_before integer;
+    v_history_count_after integer;
 BEGIN
     PERFORM c.connection_id FROM rufino_linkedin.claim_due_connections(1) c;
     SELECT nj.raw_action_token, nj.raw_claim_token INTO v_raw_action, v_raw_claim
@@ -1173,12 +1227,44 @@ BEGIN
         RAISE EXCEPTION 'SMOKE FALHOU [23]: approve_message(REFAZER) deveria transicionar para REFAZER e emitir regeneration_token (status=%)', v_status_after;
     END IF;
 
+    -- [v1.5.1, Correção 1] Nenhum token bruto persistido no receipt.
+    PERFORM 1 FROM rufino_linkedin.callback_receipts
+     WHERE callback_query_id = 'smoketest-cbq-refazer'
+       AND (result ? 'raw_regeneration_token' OR result::text LIKE '%' || v_raw_regen || '%');
+    IF FOUND THEN
+        RAISE EXCEPTION 'SMOKE FALHOU [23]: raw_regeneration_token vazou para dentro de callback_receipts.result';
+    END IF;
+    RAISE NOTICE 'SMOKE OK [23b]: raw_regeneration_token nao aparece em callback_receipts.result (nem como chave, nem como valor bruto)';
+
+    -- [v1.5.1, Correção 1] Retry do mesmo callback_query_id: idempotente
+    -- quanto a negocio, mas como a conexao ainda esta em REFAZER, devolve
+    -- um regeneration_token NOVO e utilizavel.
+    SELECT count(*) INTO v_approval_count_before FROM rufino_linkedin.approvals WHERE connection_id = v_connection_id;
+    SELECT count(*) INTO v_history_count_before FROM rufino_linkedin.connection_status_history WHERE connection_id = v_connection_id;
+
+    SELECT r.new_status, r.raw_regeneration_token INTO v_status_after, v_raw_regen_retry
+      FROM rufino_linkedin.approve_message(v_raw_action, 'REFAZER', 'telegram:anderson', 'smoketest-cbq-refazer') r;
+
+    SELECT count(*) INTO v_approval_count_after FROM rufino_linkedin.approvals WHERE connection_id = v_connection_id;
+    SELECT count(*) INTO v_history_count_after FROM rufino_linkedin.connection_status_history WHERE connection_id = v_connection_id;
+
+    IF v_approval_count_after <> v_approval_count_before OR v_history_count_after <> v_history_count_before THEN
+        RAISE EXCEPTION 'SMOKE FALHOU [23]: retry de approve_message(REFAZER) duplicou approval ou transicao (approvals % -> %, historico % -> %)',
+            v_approval_count_before, v_approval_count_after, v_history_count_before, v_history_count_after;
+    END IF;
+
+    IF v_raw_regen_retry IS NULL OR v_raw_regen_retry = v_raw_regen THEN
+        RAISE EXCEPTION 'SMOKE FALHOU [23]: retry deveria devolver um regeneration_token NOVO e nao-nulo (obtido %)', v_raw_regen_retry;
+    END IF;
+
+    RAISE NOTICE 'SMOKE OK [23c]: retry de approve_message(REFAZER) nao duplica approval/transicao e devolve regeneration_token novo e utilizavel';
+
     -- [24] Status diferente de REFAZER e rejeitado: tentamos consumir com a
     -- conexao ainda no meio (aqui ja esta REFAZER, entao testamos a
     -- validacao inversa depois de sair de REFAZER, no final deste bloco).
 
     SELECT r.connection_id, r.message_version_id, r.version INTO v_connection_id, v_mv_id, v_version
-      FROM rufino_linkedin.save_regenerated_message(v_raw_regen, 'Nova versao gerada pelo GPT.', 'gpt') r;
+      FROM rufino_linkedin.save_regenerated_message(v_raw_regen_retry, 'Nova versao gerada pelo GPT.', 'gpt') r;
 
     IF v_version <> 2 THEN
         RAISE EXCEPTION 'SMOKE FALHOU [23]: save_regenerated_message deveria criar version=2 (obtido %)', v_version;
@@ -1211,6 +1297,79 @@ BEGIN
 
     RAISE NOTICE 'SMOKE OK [23]: fluxo REFAZER completo -- regeneration_token emitido, save_regenerated_message cria nova versao e novo job APPROVAL';
     RAISE NOTICE 'SMOKE OK [24]: regeneration_token e de uso unico -- reuso rejeitado';
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- [24b] [v1.5.1, Correção 2] Outbox aceita múltiplas entregas históricas:
+--      apresentar -> entregar -> editar -> apresentar de novo -> entregar
+--      de novo precisa deixar DUAS linhas DELIVERED para a mesma conexão e
+--      job_type='APPROVAL', sem violar nenhuma constraint (a UNIQUE antiga
+--      bloqueava isso; o índice parcial não).
+-- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+    v_connection_id uuid;
+    v_raw_action text;
+    v_raw_claim text;
+    v_raw_edit text;
+    v_status_after text;
+    v_delivered_count integer;
+BEGIN
+    SELECT r.connection_id INTO v_connection_id
+      FROM rufino_linkedin.register_connection(
+        'smoketest-v151-conn-dual-delivered', 'Dual Delivered', 'Dual', 'Diretor', 'Escola Theta', 'Salvador',
+        'https://linkedin.com/in/dual-delivered-v151', NULL, CURRENT_DATE,
+        'Resumo', '["g1"]'::jsonb, 'g1', 'Justificativa', 0.9, false, '[]'::jsonb, 'brain-test-v151', 'Mensagem inicial dual delivered'
+      ) r;
+    PERFORM set_config('smoketest.conn_dual_delivered', v_connection_id::text, true);
+END;
+$$;
+
+RESET ROLE;
+UPDATE rufino_linkedin.connections SET scheduled_at = now() - interval '1 minute'
+ WHERE connection_id = current_setting('smoketest.conn_dual_delivered')::uuid;
+SET LOCAL ROLE n8n_rufino_linkedin_dev;
+
+DO $$
+DECLARE
+    v_connection_id uuid := current_setting('smoketest.conn_dual_delivered')::uuid;
+    v_raw_action text;
+    v_raw_claim text;
+    v_raw_edit text;
+    v_status_after text;
+    v_delivered_count integer;
+BEGIN
+    -- Primeiro ciclo: apresentar (claim_due_connections cria o job
+    -- APPROVAL #1) -> reivindicar -> entregar (DELIVERED #1).
+    PERFORM c.connection_id FROM rufino_linkedin.claim_due_connections(1) c;
+    SELECT nj.raw_action_token, nj.raw_claim_token INTO v_raw_action, v_raw_claim
+      FROM rufino_linkedin.claim_notification_jobs(1) nj WHERE nj.connection_id = v_connection_id;
+    PERFORM r.notification_job_id FROM rufino_linkedin.confirm_notification_delivery(v_raw_claim, 'chat-dual-1', 'msg-dual-1') r;
+
+    -- EDITAR: gera nova versao (version=2) e um novo job APPROVAL #2.
+    SELECT r.new_status, r.raw_edit_token INTO v_status_after, v_raw_edit
+      FROM rufino_linkedin.approve_message(v_raw_action, 'EDITAR', 'telegram:anderson', 'smoketest-cbq-dual-editar') r;
+
+    PERFORM r.connection_id FROM rufino_linkedin.save_message_edit(
+        v_raw_edit, 'Segunda versao da mensagem, apos edicao.', 'anderson'
+    ) r;
+
+    -- Segundo ciclo: reivindicar o job APPROVAL #2 (versao 2) -> entregar
+    -- (DELIVERED #2). Isso e o que a constraint antiga bloqueava.
+    SELECT nj.raw_action_token, nj.raw_claim_token INTO v_raw_action, v_raw_claim
+      FROM rufino_linkedin.claim_notification_jobs(1) nj WHERE nj.connection_id = v_connection_id;
+    PERFORM r.notification_job_id FROM rufino_linkedin.confirm_notification_delivery(v_raw_claim, 'chat-dual-2', 'msg-dual-2') r;
+
+    SELECT count(*) INTO v_delivered_count
+      FROM rufino_linkedin.notification_jobs
+     WHERE connection_id = v_connection_id AND job_type = 'APPROVAL' AND status = 'DELIVERED';
+
+    IF v_delivered_count <> 2 THEN
+        RAISE EXCEPTION 'SMOKE FALHOU [24b]: esperava 2 linhas DELIVERED para a mesma conexao/job_type=APPROVAL, obtido %', v_delivered_count;
+    END IF;
+
+    RAISE NOTICE 'SMOKE OK [24b]: outbox permite 2 jobs APPROVAL DELIVERED historicos para a mesma conexao, sem violar nenhuma constraint';
 END;
 $$;
 

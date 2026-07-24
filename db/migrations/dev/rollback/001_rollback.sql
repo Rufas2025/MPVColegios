@@ -1,6 +1,6 @@
 -- =============================================================================
 -- rollback/001_rollback.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.1
 --
 -- Aplicar com: psql -v ON_ERROR_STOP=1 -f rollback/001_rollback.sql
 --

@@ -167,7 +167,7 @@ SELECT * FROM rufino_linkedin.confirm_notification_delivery(
 
 **Quando `decision='REFAZER'`:** monte o pacote de contexto enviado ao GPT incluindo `raw_regeneration_token` — o GPT devolve a nova mensagem via WF-03-REGEN (seção 6).
 
-**Retry:** reexecutar com o mesmo `callback_query_id` e os mesmos `p_action_token`/`p_decision` é seguro (idempotente, mesmo depois do token já consumido). Mesmo `callback_query_id` com decisão diferente falha claramente.
+**Retry [v1.5.1]:** reexecutar com o mesmo `callback_query_id` e os mesmos `p_action_token`/`p_decision` é seguro (idempotente quanto a negócio — nunca cria um segundo `approval`, nunca repete a transição de status). **Importante para `EDITAR`/`REFAZER`: o `raw_edit_token`/`raw_regeneration_token` devolvido no retry NUNCA é o mesmo valor da primeira chamada** — o banco nunca persiste token bruto em nenhum lugar (nem em `callback_receipts`), então não há de onde devolver o valor antigo; em vez disso, se a conexão ainda estiver no estado que esperava aquele token (`AGUARDANDO_APROVACAO` para EDITAR, `REFAZER` para REFAZER), o banco emite um token **novo**, válido, e você deve usar esse (não o de uma chamada anterior). Se o fluxo já tiver avançado (ex.: o usuário já usou o link de edição antes do retry chegar), `raw_edit_token`/`raw_regeneration_token` voltam `NULL` — trate isso como "esta ação já não tem mais nada pendente para continuar", não como erro. Mesmo `callback_query_id` com decisão diferente falha claramente.
 
 **Erros esperados:** `action_token inválido` (nunca existiu), `ja consumido` (clique duplicado físico, sem retry de callback_query_id), `expirado`, `callback_query_id já processado com conteúdo diferente` (conflito real).
 
@@ -243,7 +243,7 @@ SELECT * FROM rufino_linkedin.present_message_for_delivery(
 
 **Retorno:** `delivery_event_id`, `connection_id`, `new_status`, `followup_id` (preenchido só quando `MARCAR_ENVIADA`; `VOLTAR_EDITAR` nunca cria follow-up).
 
-**Retry:** mesma disciplina de `approve_message` — mesmo `callback_query_id` + mesmo conteúdo é idempotente (devolve o mesmo `followup_id`, sem duplicar).
+**Retry [v1.5.1]:** mesma disciplina de `approve_message` — mesmo `callback_query_id` + mesmo conteúdo é idempotente (devolve o mesmo `followup_id`, sem duplicar). **Isso vale mesmo que `p_first_followup_at` já tenha passado no momento do retry** (ex.: reentrega do Telegram que chega atrasada) — a checagem de "precisa ser uma data futura" só se aplica à primeira chamada; um retry reconhecido por `callback_query_id`+conteúdo idêntico nunca é rejeitado por essa checagem. Reenvie sempre o **mesmo** valor de `p_first_followup_at` que você calculou e enviou na primeira tentativa — um valor recalculado (ex.: `now() + intervalo` reavaliado na hora do retry) muda o conteúdo e é tratado como conflito, não como retry.
 
 **Exemplo:**
 ```sql
@@ -326,7 +326,7 @@ SELECT * FROM rufino_linkedin.claim_due_followups(
 
 **Comportamento:** `RESPONDEU` sempre encerra a jornada (nunca cria próximo follow-up). `SEM_RESPOSTA` com `p_next_followup_at` cria o próximo ciclo (volta a `FOLLOWUP_PENDENTE`, reivindicável de novo por `claim_due_followups` quando chegar a hora). `SEM_RESPOSTA` sem `p_next_followup_at` encerra a jornada.
 
-**Retry:** mesmo `callback_query_id` + mesmo conteúdo é idempotente, mesmo com o `claim_token` já invalidado pela primeira chamada.
+**Retry [v1.5.1]:** mesmo `callback_query_id` + mesmo conteúdo é idempotente, mesmo com o `claim_token` já invalidado pela primeira chamada. **Isso vale mesmo que `p_next_followup_at` já tenha passado no momento do retry** — a checagem de "precisa ser uma data futura" só se aplica à primeira chamada. Reenvie sempre o **mesmo** valor de `p_next_followup_at` da primeira tentativa (um valor recalculado muda o conteúdo e é tratado como conflito).
 
 **Exemplo:**
 ```sql

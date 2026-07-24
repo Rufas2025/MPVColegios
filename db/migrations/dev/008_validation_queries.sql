@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 008_validation_queries.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.1
 --
 -- SOMENTE LEITURA. Nenhuma instrução aqui cria, altera ou remove qualquer
 -- objeto — só SELECT, para conferir depois de aplicar 001–007 que o
@@ -252,3 +252,45 @@ SELECT conname, pg_get_constraintdef(oid) AS definicao
    AND conname = 'delivery_events_delivery_mode_check';
 -- Esperado: 1 linha, definicao contendo apenas 'MANUAL_ASSISTED' na lista
 -- IN (...) — sem 'LINKEDIN_MESSAGES_API_APPROVED'.
+
+-- 22) [v1.5.1, Correção 2] Índice UNIQUE parcial de job ativo por
+--     conexão/tipo existe, e a constraint antiga (que impedia múltiplas
+--     linhas DELIVERED/SUPERSEDED históricas) não existe mais.
+SELECT indexname, indexdef
+  FROM pg_indexes
+ WHERE schemaname = 'rufino_linkedin'
+   AND indexname = 'notification_jobs_one_active_per_connection_type_idx';
+-- Esperado: 1 linha, indexdef contendo "UNIQUE" e
+-- "WHERE ((status = 'PENDING'::text) OR (status = 'CLAIMED'::text))" (ou
+-- equivalente com ANY/ARRAY, conforme o plano do Postgres).
+
+SELECT conname
+  FROM pg_constraint
+ WHERE conrelid = 'rufino_linkedin.notification_jobs'::regclass
+   AND conname = 'notification_jobs_active_per_connection_type_key';
+-- Esperado: 0 linhas — a constraint antiga, que bloqueava indevidamente
+-- duas linhas DELIVERED (ou duas SUPERSEDED) para a mesma conexão/tipo,
+-- foi substituída pelo índice parcial acima.
+
+-- 23) [v1.5.1, Correção 1] Nenhum callback_receipts.result contém a
+--     CHAVE raw_edit_token/raw_regeneration_token/raw_action_token/
+--     raw_claim_token, e nenhum valor de token bruto (48 ou 64 caracteres
+--     hex, os dois comprimentos usados nesta jornada) aparece em lugar
+--     nenhum do JSON serializado como texto — verificação de conteúdo,
+--     não só de nome de coluna.
+SELECT callback_query_id, result
+  FROM rufino_linkedin.callback_receipts
+ WHERE result ? 'raw_edit_token'
+    OR result ? 'raw_regeneration_token'
+    OR result ? 'raw_action_token'
+    OR result ? 'raw_claim_token';
+-- Esperado: 0 linhas — nenhuma dessas chaves deve existir no JSON, em
+-- nenhuma linha, de nenhuma operação (approve_message, mark_message_sent,
+-- complete_followup).
+
+SELECT callback_query_id
+  FROM rufino_linkedin.callback_receipts
+ WHERE result::text ~ '[0-9a-f]{48}' OR result::text ~ '[0-9a-f]{64}';
+-- Esperado: 0 linhas — nenhum valor de token bruto (hex de 24 ou 32
+-- bytes) aparece em texto puro em nenhum resultado persistido, mesmo sob
+-- uma chave com nome diferente.
