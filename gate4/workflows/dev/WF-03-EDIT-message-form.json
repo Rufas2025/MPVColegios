@@ -1,0 +1,78 @@
+{
+  "id": "V0neji0AlG5INqKz",
+  "name": "WF-03-EDIT - Edit Message - Rufino LinkedIn DEV",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "id": "50169ff9-1f3e-478f-b6ec-49ce7041a212",
+      "name": "Edit Message Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [240, 300],
+      "parameters": {
+        "formTitle": "Editar mensagem de conexao",
+        "formDescription": "Ajuste o texto proposto antes de reenviar para aprovacao.",
+        "formFields": {
+          "values": [
+            { "fieldName": "token", "fieldType": "hiddenField" },
+            { "fieldName": "new_message_body", "fieldLabel": "Nova mensagem", "fieldType": "textarea", "requiredField": true }
+          ]
+        },
+        "responseMode": "lastNode"
+      },
+      "webhookId": "141711da-1f29-4d6c-a174-5cc56d74a1c3"
+    },
+    {
+      "id": "43ca3a35-5a24-4202-a630-bc7956052fa6",
+      "name": "Normalize Form Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [540, 300],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "f1", "name": "edit_token", "value": "={{ $json.token }}", "type": "string" },
+            { "id": "f2", "name": "new_message_body", "value": "={{ $json.new_message_body }}", "type": "string" },
+            { "id": "f3", "name": "edited_by", "value": "anderson", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "97e16d2d-cb0e-4ef0-83bb-d547ef71f3b4",
+      "name": "Save Message Edit (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [840, 300],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.save_message_edit(\n    p_presented_edit_token => $1,\n    p_new_message_body     => $2,\n    p_edited_by            => $3,\n    p_workflow_name        => 'WF-03-EDIT',\n    p_execution_id         => $4\n);",
+        "options": { "queryReplacement": "={{ [$json.edit_token, $json.new_message_body, $json.edited_by, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "837924ea-f37c-4a34-a606-d620bd586968",
+      "name": "Edit Confirmation",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [1140, 300],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Mensagem atualizada",
+        "completionMessage": "Sua edicao foi salva. Uma nova notificacao de aprovacao sera enviada no Telegram."
+      },
+      "webhookId": "d2c9e8b4-004b-4cd3-a92c-887f7d84d61f"
+    }
+  ],
+  "connections": {
+    "Edit Message Form Trigger": { "main": [[ { "node": "Normalize Form Input", "type": "main", "index": 0 } ]] },
+    "Normalize Form Input": { "main": [[ { "node": "Save Message Edit (Postgres)", "type": "main", "index": 0 } ]] },
+    "Save Message Edit (Postgres)": { "main": [[ { "node": "Edit Confirmation", "type": "main", "index": 0 } ]] }
+  }
+}

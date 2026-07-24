@@ -1,0 +1,210 @@
+{
+  "id": "eomHxG6ODD8pMvMp",
+  "name": "WF-03 - Approval Callback - Rufino LinkedIn DEV",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "id": "de762bc8-ce12-4333-8bb1-5e02288d6718",
+      "name": "Approval Callback Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.3,
+      "position": [240, 300],
+      "parameters": {
+        "updates": ["callback_query"],
+        "additionalFields": {
+          "chatIds": "<__PLACEHOLDER_VALUE__Chat ID restrito de Anderson (Restrict to Chat IDs)__>",
+          "userIds": "<__PLACEHOLDER_VALUE__User ID restrito de Anderson (Restrict to User IDs)__>"
+        }
+      },
+      "webhookId": "b95462cc-ae7b-49b9-bb2c-919e0ff2bc32"
+    },
+    {
+      "id": "ae95535f-749b-48ae-8aed-3e9dc7590782",
+      "name": "Answer Callback Query",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [540, 300],
+      "parameters": { "resource": "callback", "operation": "answerQuery", "queryId": "={{ $json.callback_query.id }}" },
+      "webhookId": "34cbc58a-c6bf-425d-8c0e-bf5d1d3a9870"
+    },
+    {
+      "id": "4fe4d16e-f5f6-45ef-8aec-9680d1029b69",
+      "name": "Parse Callback Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [840, 300],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "p1", "name": "callback_query_id", "value": "={{ $('Approval Callback Trigger').item.json.callback_query.id }}", "type": "string" },
+            { "id": "p2", "name": "category", "value": "={{ $('Approval Callback Trigger').item.json.callback_query.data.split(':')[0] }}", "type": "string" },
+            { "id": "p3", "name": "action_letter", "value": "={{ $('Approval Callback Trigger').item.json.callback_query.data.split(':')[1] }}", "type": "string" },
+            { "id": "p4", "name": "action_token", "value": "={{ $('Approval Callback Trigger').item.json.callback_query.data.split(':')[2] }}", "type": "string" },
+            { "id": "p5", "name": "decision", "value": "={{ { A: 'APROVAR_E_PREPARAR', E: 'EDITAR', R: 'REFAZER', D: 'DESCARTAR' }[$('Approval Callback Trigger').item.json.callback_query.data.split(':')[1]] ?? '' }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a24ec862-fa47-4b40-8c68-1e40b0ea21ce",
+      "name": "Is Approval Category?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1140, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{ $json.category }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "a" },
+            { "leftValue": "={{ $json.decision }}", "operator": { "type": "string", "operation": "notEmpty" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "4704dc8e-fbc3-4b60-8f28-e5ff3fbcedcc",
+      "name": "Approve Message (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1440, 220],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.approve_message(\n    p_action_token      => $1,\n    p_decision          => $2,\n    p_actor             => 'telegram:anderson',\n    p_callback_query_id => $3,\n    p_workflow_name     => 'WF-03',\n    p_execution_id      => $4\n);",
+        "options": { "queryReplacement": "={{ [$json.action_token, $json.decision, $json.callback_query_id, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "a173fb00-1827-4c4b-9e29-2184cb306e50",
+      "name": "Route by Decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [1740, 220],
+      "parameters": {
+        "rules": {
+          "values": [
+            { "outputKey": "aprovado", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.new_status }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "APROVADO" }], "combinator": "and" } },
+            { "outputKey": "editar", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.raw_edit_token }}", "operator": { "type": "string", "operation": "exists" } }], "combinator": "and" } },
+            { "outputKey": "refazer", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.raw_regeneration_token }}", "operator": { "type": "string", "operation": "exists" } }], "combinator": "and" } }
+          ]
+        },
+        "options": { "fallbackOutput": "extra", "renameFallbackOutput": "Descartado ou sem continuacao" }
+      }
+    },
+    {
+      "id": "9e2eb197-ae7b-4651-bfd9-120632f18b89",
+      "name": "Get Current Message Version",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [2040, 60],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT message_version_id FROM rufino_linkedin.message_versions\n WHERE connection_id = $1\n ORDER BY version DESC\n LIMIT 1;",
+        "options": { "queryReplacement": "={{ [$json.connection_id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "b7feda68-38fe-4d92-aa5f-8a2d8a9a03b7",
+      "name": "Present Message For Delivery",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [2340, 60],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.present_message_for_delivery(\n    p_connection_id      => $1,\n    p_message_version_id => $2,\n    p_actor              => 'sistema',\n    p_workflow_name      => 'WF-04',\n    p_execution_id       => $3\n);",
+        "options": { "queryReplacement": "={{ [$('Approve Message (Postgres)').item.json.connection_id, $json.message_version_id, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "f608ef50-4f7f-4dfd-a19e-6d98182b0e5a",
+      "name": "Remove Original Inline Buttons",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2640, 300],
+      "parameters": {
+        "resource": "message",
+        "operation": "editMessageText",
+        "chatId": "={{ $('Approval Callback Trigger').item.json.callback_query.message.chat.id }}",
+        "messageId": "={{ $('Approval Callback Trigger').item.json.callback_query.message.message_id }}",
+        "text": "={{ $('Approval Callback Trigger').item.json.callback_query.message.text }}",
+        "replyMarkup": "none"
+      },
+      "webhookId": "b5542f8f-ee78-49ae-9520-1bcb676f6e38"
+    },
+    {
+      "id": "c7f275af-ffa6-4118-a829-fb8c8298468a",
+      "name": "Build Edit Form Link",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2040, 160],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            { "id": "ed1", "name": "form_base_url", "value": "<__PLACEHOLDER_VALUE__URL base do n8n Form de edicao (WF-03-EDIT), ex.: https://n8n.example.com/form/edit-message__>", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "03e552cf-694f-4408-af05-ecd9065e3a4a",
+      "name": "Send Edit Form Link",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2340, 160],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Approval Callback Trigger').item.json.callback_query.message.chat.id }}",
+        "text": "={{ \"Link para editar a mensagem: \" + $json.form_base_url + \"?token=\" + $json.raw_edit_token }}",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "webhookId": "87412b5b-c734-48c2-90de-985c13a82a1c"
+    },
+    {
+      "id": "f9e11796-ea2c-4898-a117-0c800b19d31b",
+      "name": "Send Regenerate Context To GPT",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2040, 380],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Approval Callback Trigger').item.json.callback_query.message.chat.id }}",
+        "text": "={{ \"Abra o Rufino LinkedIn Intelligence e cole este token de regeneracao: \" + $json.raw_regeneration_token }}",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "webhookId": "0db4a845-93f7-43a1-a17b-446f160d1137"
+    }
+  ],
+  "connections": {
+    "Approval Callback Trigger": { "main": [[ { "node": "Answer Callback Query", "type": "main", "index": 0 } ]] },
+    "Answer Callback Query": { "main": [[ { "node": "Parse Callback Data", "type": "main", "index": 0 } ]] },
+    "Parse Callback Data": { "main": [[ { "node": "Is Approval Category?", "type": "main", "index": 0 } ]] },
+    "Is Approval Category?": { "main": [[ { "node": "Approve Message (Postgres)", "type": "main", "index": 0 } ]] },
+    "Approve Message (Postgres)": { "main": [[ { "node": "Route by Decision", "type": "main", "index": 0 } ]] },
+    "Route by Decision": {
+      "main": [
+        [ { "node": "Get Current Message Version", "type": "main", "index": 0 } ],
+        [ { "node": "Build Edit Form Link", "type": "main", "index": 0 } ],
+        [ { "node": "Send Regenerate Context To GPT", "type": "main", "index": 0 } ],
+        [ { "node": "Remove Original Inline Buttons", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Get Current Message Version": { "main": [[ { "node": "Present Message For Delivery", "type": "main", "index": 0 } ]] },
+    "Present Message For Delivery": { "main": [[ { "node": "Remove Original Inline Buttons", "type": "main", "index": 0 } ]] },
+    "Build Edit Form Link": { "main": [[ { "node": "Send Edit Form Link", "type": "main", "index": 0 } ]] },
+    "Send Edit Form Link": { "main": [[ { "node": "Remove Original Inline Buttons", "type": "main", "index": 0 } ]] },
+    "Send Regenerate Context To GPT": { "main": [[ { "node": "Remove Original Inline Buttons", "type": "main", "index": 0 } ]] }
+  }
+}

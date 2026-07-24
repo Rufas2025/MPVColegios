@@ -1,0 +1,116 @@
+{
+  "id": "poBq03kSHdpPJN34",
+  "name": "WF-03-REGEN - Regenerate Message - Rufino LinkedIn DEV",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "id": "b9a37568-3204-431d-87f5-ed95c8bb1047",
+      "name": "Regenerate Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [240, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf03-regen-rufino-linkedin-dev",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "ebc461c3-8bdd-4d9f-9db9-0db495362181"
+    },
+    {
+      "id": "b570e031-db38-423a-b050-91a5782d9752",
+      "name": "Normalize Regeneration Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [540, 300],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "g1", "name": "regeneration_token", "value": "={{ $json.body?.regeneration_token ?? \"\" }}", "type": "string" },
+            { "id": "g2", "name": "new_message_body", "value": "={{ $json.body?.new_message_body ?? \"\" }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "11d0d987-2da7-492c-a4cf-fee0c5f3791b",
+      "name": "Validate Regeneration Payload",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [840, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{ $json.regeneration_token }}", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{ $json.new_message_body }}", "operator": { "type": "string", "operation": "notEmpty" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "37e8bc6a-1e0e-477c-a381-015475dbc087",
+      "name": "Save Regenerated Message (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1140, 220],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.save_regenerated_message(\n    p_presented_regeneration_token => $1,\n    p_new_message_body             => $2,\n    p_actor                        => 'gpt',\n    p_workflow_name                => 'WF-03-REGEN',\n    p_execution_id                 => $3\n);",
+        "options": { "queryReplacement": "={{ [$json.regeneration_token, $json.new_message_body, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "20c033d5-71a0-4378-80a4-c83d943f30c8",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1440, 220],
+      "parameters": { "respondWith": "json", "responseBody": "={{ $json }}", "options": { "responseCode": 200 } }
+    },
+    {
+      "id": "c45311ac-73c7-4a3c-8301-70fa1b816cca",
+      "name": "Build Validation Error Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1140, 420],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "e1", "name": "error", "value": "validation_error", "type": "string" },
+            { "id": "e2", "name": "message", "value": "regeneration_token e new_message_body sao obrigatorios", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a27bd85a-9913-4258-bbae-5fae92ecfd12",
+      "name": "Respond 400 Bad Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1440, 420],
+      "parameters": { "respondWith": "json", "responseBody": "={{ $json }}", "options": { "responseCode": 400 } }
+    }
+  ],
+  "connections": {
+    "Regenerate Webhook": { "main": [[ { "node": "Normalize Regeneration Payload", "type": "main", "index": 0 } ]] },
+    "Normalize Regeneration Payload": { "main": [[ { "node": "Validate Regeneration Payload", "type": "main", "index": 0 } ]] },
+    "Validate Regeneration Payload": {
+      "main": [
+        [ { "node": "Save Regenerated Message (Postgres)", "type": "main", "index": 0 } ],
+        [ { "node": "Build Validation Error Response", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Save Regenerated Message (Postgres)": { "main": [[ { "node": "Respond 200 OK", "type": "main", "index": 0 } ]] },
+    "Build Validation Error Response": { "main": [[ { "node": "Respond 400 Bad Request", "type": "main", "index": 0 } ]] }
+  }
+}

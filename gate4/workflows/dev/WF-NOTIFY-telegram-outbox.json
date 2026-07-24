@@ -1,0 +1,172 @@
+{
+  "id": "xmshrOsfUkWSBfnG",
+  "name": "WF-NOTIFY - Telegram Outbox - Rufino LinkedIn DEV",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "id": "65ae1936-cbda-44d4-84e8-f9ee121ff0a9",
+      "name": "Outbox Drain Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [240, 300],
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] } }
+    },
+    {
+      "id": "a15080f0-19ab-4151-b858-4d92cd54476a",
+      "name": "Claim Notification Jobs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [540, 300],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.claim_notification_jobs(\n    p_limit         => 20,\n    p_workflow_name => 'WF-NOTIFY',\n    p_execution_id  => $1\n);",
+        "options": { "queryReplacement": "={{ [$execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "d4d84d16-2d12-469c-819d-fc473ad72af6",
+      "name": "Route by Job Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [840, 300],
+      "parameters": {
+        "rules": {
+          "values": [
+            { "outputKey": "approval", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.job_type }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "APPROVAL" }], "combinator": "and" } },
+            { "outputKey": "delivery", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.job_type }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "DELIVERY" }], "combinator": "and" } }
+          ]
+        },
+        "options": { "fallbackOutput": "none" }
+      }
+    },
+    {
+      "id": "3af215ec-7421-4e23-8bf7-08fb4aec6bc4",
+      "name": "Build Approval Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1140, 180],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            { "id": "c1", "name": "telegram_chat_id", "value": "<__PLACEHOLDER_VALUE__Chat ID do Telegram de Anderson (ex.: 123456789)__>", "type": "string" },
+            { "id": "c2", "name": "telegram_text", "value": "=*Nova conexao no LinkedIn*\n\n{{ $json.nome }} - {{ $json.cargo }} em {{ $json.instituicao }}\n{{ $json.cidade }}\n\nMensagem proposta:\n{{ $json.message_body }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "225f5a64-af51-4b71-afba-3f0427020ea7",
+      "name": "Send Approval Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1440, 180],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.telegram_chat_id }}",
+        "text": "={{ $json.telegram_text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            { "row": { "buttons": [
+              { "text": "Aprovar e preparar", "additionalFields": { "callback_data": "={{ \"a:A:\" + $json.raw_action_token }}" } },
+              { "text": "Editar", "additionalFields": { "callback_data": "={{ \"a:E:\" + $json.raw_action_token }}" } }
+            ] } },
+            { "row": { "buttons": [
+              { "text": "Refazer", "additionalFields": { "callback_data": "={{ \"a:R:\" + $json.raw_action_token }}" } },
+              { "text": "Descartar", "additionalFields": { "callback_data": "={{ \"a:D:\" + $json.raw_action_token }}" } }
+            ] } }
+          ]
+        },
+        "additionalFields": { "appendAttribution": false }
+      },
+      "webhookId": "a2ec4234-3df4-4b92-ab97-a33b692b141c"
+    },
+    {
+      "id": "03944956-4bec-4239-bf48-073e5bae6022",
+      "name": "Confirm Approval Delivery",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1740, 180],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.confirm_notification_delivery(\n    p_claim_token         => $1,\n    p_telegram_chat_id    => $2,\n    p_telegram_message_id => $3,\n    p_workflow_name       => 'WF-NOTIFY',\n    p_execution_id        => $4\n);",
+        "options": { "queryReplacement": "={{ [$(\"Claim Notification Jobs\").item.json.raw_claim_token, $json.result.chat.id, $json.result.message_id, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "f3e5387d-76fc-4006-b97d-a3b951c63ed8",
+      "name": "Build Delivery Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1140, 420],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            { "id": "d1", "name": "telegram_chat_id", "value": "<__PLACEHOLDER_VALUE__Chat ID do Telegram de Anderson (ex.: 123456789)__>", "type": "string" },
+            { "id": "d2", "name": "telegram_text", "value": "=*Mensagem aprovada, pronta para enviar*\n\n{{ $json.nome }} - {{ $json.profile_url }}\n\nCopie e envie no LinkedIn:\n{{ $json.message_body }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "40da99f7-e9dd-433c-afbb-24af3fa04562",
+      "name": "Send Delivery Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1440, 420],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.telegram_chat_id }}",
+        "text": "={{ $json.telegram_text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            { "row": { "buttons": [ { "text": "Abrir perfil", "additionalFields": { "url": "={{ $json.profile_url }}" } } ] } },
+            { "row": { "buttons": [
+              { "text": "Marcar como enviada", "additionalFields": { "callback_data": "={{ \"a:S:\" + $json.raw_action_token }}" } },
+              { "text": "Voltar e editar", "additionalFields": { "callback_data": "={{ \"a:B:\" + $json.raw_action_token }}" } }
+            ] } }
+          ]
+        },
+        "additionalFields": { "appendAttribution": false }
+      },
+      "webhookId": "42cda7a1-7994-46b0-aebc-32008506c949"
+    },
+    {
+      "id": "89953a89-dbdc-41ad-9ba0-1a025f487f95",
+      "name": "Confirm Delivery Notification",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1740, 420],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.confirm_notification_delivery(\n    p_claim_token         => $1,\n    p_telegram_chat_id    => $2,\n    p_telegram_message_id => $3,\n    p_workflow_name       => 'WF-NOTIFY',\n    p_execution_id        => $4\n);",
+        "options": { "queryReplacement": "={{ [$(\"Claim Notification Jobs\").item.json.raw_claim_token, $json.result.chat.id, $json.result.message_id, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    }
+  ],
+  "connections": {
+    "Outbox Drain Schedule": { "main": [[ { "node": "Claim Notification Jobs", "type": "main", "index": 0 } ]] },
+    "Claim Notification Jobs": { "main": [[ { "node": "Route by Job Type", "type": "main", "index": 0 } ]] },
+    "Route by Job Type": { "main": [ [ { "node": "Build Approval Message", "type": "main", "index": 0 } ], [ { "node": "Build Delivery Message", "type": "main", "index": 0 } ] ] },
+    "Build Approval Message": { "main": [[ { "node": "Send Approval Telegram Message", "type": "main", "index": 0 } ]] },
+    "Send Approval Telegram Message": { "main": [[ { "node": "Confirm Approval Delivery", "type": "main", "index": 0 } ]] },
+    "Build Delivery Message": { "main": [[ { "node": "Send Delivery Telegram Message", "type": "main", "index": 0 } ]] },
+    "Send Delivery Telegram Message": { "main": [[ { "node": "Confirm Delivery Notification", "type": "main", "index": 0 } ]] }
+  }
+}

@@ -1,0 +1,2873 @@
+[
+  {
+    "name": "WF-01 - Intake - Rufino LinkedIn DEV",
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "a1b1c1d1-0001-4000-8000-000000000001",
+        "name": "Intake Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "wf01-intake-rufino-linkedin-dev",
+          "authentication": "headerAuth",
+          "responseMode": "responseNode",
+          "options": {}
+        }
+      },
+      {
+        "id": "a1b1c1d1-0001-4000-8000-000000000002",
+        "name": "Normalize Intake Payload",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          540,
+          300
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "a1",
+                "name": "connection_id",
+                "value": "={{ $json.body?.connection_id ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a2",
+                "name": "idempotency_key",
+                "value": "={{ $json.body?.connection_id ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a3",
+                "name": "nome",
+                "value": "={{ $json.body?.nome ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a4",
+                "name": "primeiro_nome",
+                "value": "={{ $json.body?.primeiro_nome ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a5",
+                "name": "cargo",
+                "value": "={{ $json.body?.cargo ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a6",
+                "name": "instituicao",
+                "value": "={{ $json.body?.instituicao ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a7",
+                "name": "cidade",
+                "value": "={{ $json.body?.cidade ?? null }}",
+                "type": "string"
+              },
+              {
+                "id": "a8",
+                "name": "profile_url",
+                "value": "={{ $json.body?.profile_url ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a9",
+                "name": "conversation_url",
+                "value": "={{ $json.body?.conversation_url ?? null }}",
+                "type": "string"
+              },
+              {
+                "id": "a10",
+                "name": "data_conexao",
+                "value": "={{ $json.body?.data_conexao ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a11",
+                "name": "resumo",
+                "value": "={{ $json.body?.resumo ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a12",
+                "name": "ganchos",
+                "value": "={{ $json.body?.ganchos ?? [] }}",
+                "type": "array"
+              },
+              {
+                "id": "a13",
+                "name": "melhor_gancho",
+                "value": "={{ $json.body?.melhor_gancho ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a14",
+                "name": "justificativa",
+                "value": "={{ $json.body?.justificativa ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a15",
+                "name": "mensagem",
+                "value": "={{ $json.body?.mensagem ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a16",
+                "name": "confianca",
+                "value": "={{ $json.body?.confianca ?? 0 }}",
+                "type": "number"
+              },
+              {
+                "id": "a17",
+                "name": "sensivel",
+                "value": "={{ $json.body?.sensivel ?? false }}",
+                "type": "boolean"
+              },
+              {
+                "id": "a18",
+                "name": "alertas",
+                "value": "={{ $json.body?.alertas ?? [] }}",
+                "type": "array"
+              },
+              {
+                "id": "a19",
+                "name": "brain_version",
+                "value": "={{ $json.body?.brain_version ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "a20",
+                "name": "delivery_mode",
+                "value": "={{ $json.body?.delivery_mode ?? \"\" }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "a1b1c1d1-0001-4000-8000-000000000003",
+        "name": "Validate Required Fields",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          840,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.nome }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              },
+              {
+                "leftValue": "={{ $json.primeiro_nome }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              },
+              {
+                "leftValue": "={{ $json.profile_url }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              },
+              {
+                "leftValue": "={{ $json.data_conexao }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              },
+              {
+                "leftValue": "={{ $json.mensagem }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              },
+              {
+                "leftValue": "={{ $json.delivery_mode }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                },
+                "rightValue": "MANUAL_ASSISTED"
+              }
+            ],
+            "combinator": "and"
+          }
+        }
+      },
+      {
+        "id": "a1b1c1d1-0001-4000-8000-000000000004",
+        "name": "Register Connection (Postgres)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1140,
+          220
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.register_connection(\n    p_idempotency_key  => $1,\n    p_nome             => $2,\n    p_primeiro_nome    => $3,\n    p_cargo            => $4,\n    p_instituicao      => $5,\n    p_cidade           => $6,\n    p_profile_url      => $7,\n    p_conversation_url => $8,\n    p_data_conexao     => $9::date,\n    p_resumo           => $10,\n    p_ganchos          => $11::jsonb,\n    p_melhor_gancho    => $12,\n    p_justificativa    => $13,\n    p_confianca        => $14::numeric,\n    p_sensivel         => $15::boolean,\n    p_alertas          => $16::jsonb,\n    p_brain_version    => $17,\n    p_mensagem         => $18,\n    p_workflow_name    => 'WF-01',\n    p_execution_id     => $19\n);",
+          "options": {
+            "queryReplacement": "={{ [$json.idempotency_key, $json.nome, $json.primeiro_nome, $json.cargo, $json.instituicao, $json.cidade, $json.profile_url, $json.conversation_url, $json.data_conexao, $json.resumo, JSON.stringify($json.ganchos), $json.melhor_gancho, $json.justificativa, $json.confianca, $json.sensivel, JSON.stringify($json.alertas), $json.brain_version, $json.mensagem, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "a1b1c1d1-0001-4000-8000-000000000005",
+        "name": "Build Success Response",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1440,
+          220
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "r1",
+                "name": "connection_id",
+                "value": "={{ $json.connection_id }}",
+                "type": "string"
+              },
+              {
+                "id": "r2",
+                "name": "status",
+                "value": "={{ $json.status }}",
+                "type": "string"
+              },
+              {
+                "id": "r3",
+                "name": "scheduled_at",
+                "value": "={{ $json.scheduled_at }}",
+                "type": "string"
+              },
+              {
+                "id": "r4",
+                "name": "message_version_id",
+                "value": "={{ $json.message_version_id }}",
+                "type": "string"
+              },
+              {
+                "id": "r5",
+                "name": "already_existed",
+                "value": "={{ $json.already_existed }}",
+                "type": "boolean"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "a1b1c1d1-0001-4000-8000-000000000006",
+        "name": "Respond 200 OK",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          1740,
+          220
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {
+            "responseCode": 200
+          }
+        }
+      },
+      {
+        "id": "a1b1c1d1-0001-4000-8000-000000000007",
+        "name": "Build Validation Error Response",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1140,
+          420
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "e1",
+                "name": "error",
+                "value": "validation_error",
+                "type": "string"
+              },
+              {
+                "id": "e2",
+                "name": "message",
+                "value": "Payload invalido: campo obrigatorio ausente ou delivery_mode nao suportado (so MANUAL_ASSISTED nesta versao)",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "a1b1c1d1-0001-4000-8000-000000000008",
+        "name": "Respond 400 Bad Request",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          1440,
+          420
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {
+            "responseCode": 400
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Intake Webhook": {
+        "main": [
+          [
+            {
+              "node": "Normalize Intake Payload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize Intake Payload": {
+        "main": [
+          [
+            {
+              "node": "Validate Required Fields",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Required Fields": {
+        "main": [
+          [
+            {
+              "node": "Register Connection (Postgres)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build Validation Error Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Register Connection (Postgres)": {
+        "main": [
+          [
+            {
+              "node": "Build Success Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Success Response": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 OK",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Validation Error Response": {
+        "main": [
+          [
+            {
+              "node": "Respond 400 Bad Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "_gate4_note": "NAO importado na instancia real: a atualizacao ao vivo do workflow WF-01 - Intake - Rufino LinkedIn DEV (id 7qclFIAJGlRPODH8) esta bloqueada porque o MCP nao tem acesso habilitado nesse workflow especifico (mensagem da instancia: 'Workflow is not available in MCP. Enable MCP access from the workflow card in the workflows list, or from the workflow settings.'). Este JSON foi gerado e validado via validate_workflow (nodeCount=8, valid=true) mas precisa de importacao manual. Ver README-IMPORT.md e VALIDATION-REPORT.md."
+  },
+  {
+    "id": "CxLUUmLpj3mA0nfz",
+    "name": "WF-02 - Scheduler D+1 - Rufino LinkedIn DEV",
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "3bb44228-bb85-443b-84ca-9efbb40b34b2",
+        "name": "D+1 Daily Schedule",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "days",
+                "daysInterval": 1,
+                "triggerAtHour": 9,
+                "triggerAtMinute": 0
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "dc0c25d3-709e-4ca3-a733-cf286a93a1c1",
+        "name": "Claim Due Connections (Postgres)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          540,
+          300
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.claim_due_connections(\n    p_limit         => 50,\n    p_workflow_name => 'WF-02',\n    p_execution_id  => $1\n);",
+          "options": {
+            "queryReplacement": "={{ [$execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "D+1 Daily Schedule": {
+        "main": [
+          [
+            {
+              "node": "Claim Due Connections (Postgres)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "id": "xmshrOsfUkWSBfnG",
+    "name": "WF-NOTIFY - Telegram Outbox - Rufino LinkedIn DEV",
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "65ae1936-cbda-44d4-84e8-f9ee121ff0a9",
+        "name": "Outbox Drain Schedule",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "a15080f0-19ab-4151-b858-4d92cd54476a",
+        "name": "Claim Notification Jobs",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          540,
+          300
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.claim_notification_jobs(\n    p_limit         => 20,\n    p_workflow_name => 'WF-NOTIFY',\n    p_execution_id  => $1\n);",
+          "options": {
+            "queryReplacement": "={{ [$execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "d4d84d16-2d12-469c-819d-fc473ad72af6",
+        "name": "Route by Job Type",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.4,
+        "position": [
+          840,
+          300
+        ],
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "outputKey": "approval",
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.job_type }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "rightValue": "APPROVAL"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "outputKey": "delivery",
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.job_type }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "rightValue": "DELIVERY"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "none"
+          }
+        }
+      },
+      {
+        "id": "3af215ec-7421-4e23-8bf7-08fb4aec6bc4",
+        "name": "Build Approval Message",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1140,
+          180
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": true,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "c1",
+                "name": "telegram_chat_id",
+                "value": "<__PLACEHOLDER_VALUE__Chat ID do Telegram de Anderson (ex.: 123456789)__>",
+                "type": "string"
+              },
+              {
+                "id": "c2",
+                "name": "telegram_text",
+                "value": "=*Nova conexao no LinkedIn*\n\n{{ $json.nome }} - {{ $json.cargo }} em {{ $json.instituicao }}\n{{ $json.cidade }}\n\nMensagem proposta:\n{{ $json.message_body }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "225f5a64-af51-4b71-afba-3f0427020ea7",
+        "name": "Send Approval Telegram Message",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1440,
+          180
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "sendMessage",
+          "chatId": "={{ $json.telegram_chat_id }}",
+          "text": "={{ $json.telegram_text }}",
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "Aprovar e preparar",
+                      "additionalFields": {
+                        "callback_data": "={{ \"a:A:\" + $json.raw_action_token }}"
+                      }
+                    },
+                    {
+                      "text": "Editar",
+                      "additionalFields": {
+                        "callback_data": "={{ \"a:E:\" + $json.raw_action_token }}"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "Refazer",
+                      "additionalFields": {
+                        "callback_data": "={{ \"a:R:\" + $json.raw_action_token }}"
+                      }
+                    },
+                    {
+                      "text": "Descartar",
+                      "additionalFields": {
+                        "callback_data": "={{ \"a:D:\" + $json.raw_action_token }}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "webhookId": "a2ec4234-3df4-4b92-ab97-a33b692b141c"
+      },
+      {
+        "id": "03944956-4bec-4239-bf48-073e5bae6022",
+        "name": "Confirm Approval Delivery",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1740,
+          180
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.confirm_notification_delivery(\n    p_claim_token         => $1,\n    p_telegram_chat_id    => $2,\n    p_telegram_message_id => $3,\n    p_workflow_name       => 'WF-NOTIFY',\n    p_execution_id        => $4\n);",
+          "options": {
+            "queryReplacement": "={{ [$(\"Claim Notification Jobs\").item.json.raw_claim_token, $json.result.chat.id, $json.result.message_id, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "f3e5387d-76fc-4006-b97d-a3b951c63ed8",
+        "name": "Build Delivery Message",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1140,
+          420
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": true,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "d1",
+                "name": "telegram_chat_id",
+                "value": "<__PLACEHOLDER_VALUE__Chat ID do Telegram de Anderson (ex.: 123456789)__>",
+                "type": "string"
+              },
+              {
+                "id": "d2",
+                "name": "telegram_text",
+                "value": "=*Mensagem aprovada, pronta para enviar*\n\n{{ $json.nome }} - {{ $json.profile_url }}\n\nCopie e envie no LinkedIn:\n{{ $json.message_body }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "40da99f7-e9dd-433c-afbb-24af3fa04562",
+        "name": "Send Delivery Telegram Message",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1440,
+          420
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "sendMessage",
+          "chatId": "={{ $json.telegram_chat_id }}",
+          "text": "={{ $json.telegram_text }}",
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "Abrir perfil",
+                      "additionalFields": {
+                        "url": "={{ $json.profile_url }}"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "Marcar como enviada",
+                      "additionalFields": {
+                        "callback_data": "={{ \"a:S:\" + $json.raw_action_token }}"
+                      }
+                    },
+                    {
+                      "text": "Voltar e editar",
+                      "additionalFields": {
+                        "callback_data": "={{ \"a:B:\" + $json.raw_action_token }}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "webhookId": "42cda7a1-7994-46b0-aebc-32008506c949"
+      },
+      {
+        "id": "89953a89-dbdc-41ad-9ba0-1a025f487f95",
+        "name": "Confirm Delivery Notification",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1740,
+          420
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.confirm_notification_delivery(\n    p_claim_token         => $1,\n    p_telegram_chat_id    => $2,\n    p_telegram_message_id => $3,\n    p_workflow_name       => 'WF-NOTIFY',\n    p_execution_id        => $4\n);",
+          "options": {
+            "queryReplacement": "={{ [$(\"Claim Notification Jobs\").item.json.raw_claim_token, $json.result.chat.id, $json.result.message_id, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Outbox Drain Schedule": {
+        "main": [
+          [
+            {
+              "node": "Claim Notification Jobs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claim Notification Jobs": {
+        "main": [
+          [
+            {
+              "node": "Route by Job Type",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route by Job Type": {
+        "main": [
+          [
+            {
+              "node": "Build Approval Message",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build Delivery Message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Approval Message": {
+        "main": [
+          [
+            {
+              "node": "Send Approval Telegram Message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Send Approval Telegram Message": {
+        "main": [
+          [
+            {
+              "node": "Confirm Approval Delivery",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Delivery Message": {
+        "main": [
+          [
+            {
+              "node": "Send Delivery Telegram Message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Send Delivery Telegram Message": {
+        "main": [
+          [
+            {
+              "node": "Confirm Delivery Notification",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "id": "eomHxG6ODD8pMvMp",
+    "name": "WF-03 - Approval Callback - Rufino LinkedIn DEV",
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "de762bc8-ce12-4333-8bb1-5e02288d6718",
+        "name": "Approval Callback Trigger",
+        "type": "n8n-nodes-base.telegramTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "updates": [
+            "callback_query"
+          ],
+          "additionalFields": {
+            "chatIds": "<__PLACEHOLDER_VALUE__Chat ID restrito de Anderson (Restrict to Chat IDs)__>",
+            "userIds": "<__PLACEHOLDER_VALUE__User ID restrito de Anderson (Restrict to User IDs)__>"
+          }
+        },
+        "webhookId": "b95462cc-ae7b-49b9-bb2c-919e0ff2bc32"
+      },
+      {
+        "id": "ae95535f-749b-48ae-8aed-3e9dc7590782",
+        "name": "Answer Callback Query",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          540,
+          300
+        ],
+        "parameters": {
+          "resource": "callback",
+          "operation": "answerQuery",
+          "queryId": "={{ $json.callback_query.id }}"
+        },
+        "webhookId": "34cbc58a-c6bf-425d-8c0e-bf5d1d3a9870"
+      },
+      {
+        "id": "4fe4d16e-f5f6-45ef-8aec-9680d1029b69",
+        "name": "Parse Callback Data",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          840,
+          300
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "p1",
+                "name": "callback_query_id",
+                "value": "={{ $('Approval Callback Trigger').item.json.callback_query.id }}",
+                "type": "string"
+              },
+              {
+                "id": "p2",
+                "name": "category",
+                "value": "={{ $('Approval Callback Trigger').item.json.callback_query.data.split(':')[0] }}",
+                "type": "string"
+              },
+              {
+                "id": "p3",
+                "name": "action_letter",
+                "value": "={{ $('Approval Callback Trigger').item.json.callback_query.data.split(':')[1] }}",
+                "type": "string"
+              },
+              {
+                "id": "p4",
+                "name": "action_token",
+                "value": "={{ $('Approval Callback Trigger').item.json.callback_query.data.split(':')[2] }}",
+                "type": "string"
+              },
+              {
+                "id": "p5",
+                "name": "decision",
+                "value": "={{ { A: 'APROVAR_E_PREPARAR', E: 'EDITAR', R: 'REFAZER', D: 'DESCARTAR' }[$('Approval Callback Trigger').item.json.callback_query.data.split(':')[1]] ?? '' }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "a24ec862-fa47-4b40-8c68-1e40b0ea21ce",
+        "name": "Is Approval Category?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1140,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.category }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                },
+                "rightValue": "a"
+              },
+              {
+                "leftValue": "={{ $json.decision }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        }
+      },
+      {
+        "id": "4704dc8e-fbc3-4b60-8f28-e5ff3fbcedcc",
+        "name": "Approve Message (Postgres)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1440,
+          220
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.approve_message(\n    p_action_token      => $1,\n    p_decision          => $2,\n    p_actor             => 'telegram:anderson',\n    p_callback_query_id => $3,\n    p_workflow_name     => 'WF-03',\n    p_execution_id      => $4\n);",
+          "options": {
+            "queryReplacement": "={{ [$json.action_token, $json.decision, $json.callback_query_id, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "a173fb00-1827-4c4b-9e29-2184cb306e50",
+        "name": "Route by Decision",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.4,
+        "position": [
+          1740,
+          220
+        ],
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "outputKey": "aprovado",
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.new_status }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "rightValue": "APROVADO"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "outputKey": "editar",
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.raw_edit_token }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "exists"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "outputKey": "refazer",
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.raw_regeneration_token }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "exists"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "extra",
+            "renameFallbackOutput": "Descartado ou sem continuacao"
+          }
+        }
+      },
+      {
+        "id": "9e2eb197-ae7b-4651-bfd9-120632f18b89",
+        "name": "Get Current Message Version",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          2040,
+          60
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT message_version_id FROM rufino_linkedin.message_versions\n WHERE connection_id = $1\n ORDER BY version DESC\n LIMIT 1;",
+          "options": {
+            "queryReplacement": "={{ [$json.connection_id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "b7feda68-38fe-4d92-aa5f-8a2d8a9a03b7",
+        "name": "Present Message For Delivery",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          2340,
+          60
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.present_message_for_delivery(\n    p_connection_id      => $1,\n    p_message_version_id => $2,\n    p_actor              => 'sistema',\n    p_workflow_name      => 'WF-04',\n    p_execution_id       => $3\n);",
+          "options": {
+            "queryReplacement": "={{ [$('Approve Message (Postgres)').item.json.connection_id, $json.message_version_id, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "f608ef50-4f7f-4dfd-a19e-6d98182b0e5a",
+        "name": "Remove Original Inline Buttons",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2640,
+          300
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "editMessageText",
+          "chatId": "={{ $('Approval Callback Trigger').item.json.callback_query.message.chat.id }}",
+          "messageId": "={{ $('Approval Callback Trigger').item.json.callback_query.message.message_id }}",
+          "text": "={{ $('Approval Callback Trigger').item.json.callback_query.message.text }}",
+          "replyMarkup": "none"
+        },
+        "webhookId": "b5542f8f-ee78-49ae-9520-1bcb676f6e38"
+      },
+      {
+        "id": "c7f275af-ffa6-4118-a829-fb8c8298468a",
+        "name": "Build Edit Form Link",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          2040,
+          160
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": true,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "ed1",
+                "name": "form_base_url",
+                "value": "<__PLACEHOLDER_VALUE__URL base do n8n Form de edicao (WF-03-EDIT), ex.: https://n8n.example.com/form/edit-message__>",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "03e552cf-694f-4408-af05-ecd9065e3a4a",
+        "name": "Send Edit Form Link",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2340,
+          160
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "sendMessage",
+          "chatId": "={{ $('Approval Callback Trigger').item.json.callback_query.message.chat.id }}",
+          "text": "={{ \"Link para editar a mensagem: \" + $json.form_base_url + \"?token=\" + $json.raw_edit_token }}",
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "webhookId": "87412b5b-c734-48c2-90de-985c13a82a1c"
+      },
+      {
+        "id": "f9e11796-ea2c-4898-a117-0c800b19d31b",
+        "name": "Send Regenerate Context To GPT",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2040,
+          380
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "sendMessage",
+          "chatId": "={{ $('Approval Callback Trigger').item.json.callback_query.message.chat.id }}",
+          "text": "={{ \"Abra o Rufino LinkedIn Intelligence e cole este token de regeneracao: \" + $json.raw_regeneration_token }}",
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "webhookId": "0db4a845-93f7-43a1-a17b-446f160d1137"
+      }
+    ],
+    "connections": {
+      "Approval Callback Trigger": {
+        "main": [
+          [
+            {
+              "node": "Answer Callback Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Answer Callback Query": {
+        "main": [
+          [
+            {
+              "node": "Parse Callback Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Callback Data": {
+        "main": [
+          [
+            {
+              "node": "Is Approval Category?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Approval Category?": {
+        "main": [
+          [
+            {
+              "node": "Approve Message (Postgres)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Approve Message (Postgres)": {
+        "main": [
+          [
+            {
+              "node": "Route by Decision",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route by Decision": {
+        "main": [
+          [
+            {
+              "node": "Get Current Message Version",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build Edit Form Link",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Send Regenerate Context To GPT",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Remove Original Inline Buttons",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Current Message Version": {
+        "main": [
+          [
+            {
+              "node": "Present Message For Delivery",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Present Message For Delivery": {
+        "main": [
+          [
+            {
+              "node": "Remove Original Inline Buttons",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Edit Form Link": {
+        "main": [
+          [
+            {
+              "node": "Send Edit Form Link",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Send Edit Form Link": {
+        "main": [
+          [
+            {
+              "node": "Remove Original Inline Buttons",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Send Regenerate Context To GPT": {
+        "main": [
+          [
+            {
+              "node": "Remove Original Inline Buttons",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "id": "V0neji0AlG5INqKz",
+    "name": "WF-03-EDIT - Edit Message - Rufino LinkedIn DEV",
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "50169ff9-1f3e-478f-b6ec-49ce7041a212",
+        "name": "Edit Message Form Trigger",
+        "type": "n8n-nodes-base.formTrigger",
+        "typeVersion": 2.6,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "formTitle": "Editar mensagem de conexao",
+          "formDescription": "Ajuste o texto proposto antes de reenviar para aprovacao.",
+          "formFields": {
+            "values": [
+              {
+                "fieldName": "token",
+                "fieldType": "hiddenField"
+              },
+              {
+                "fieldName": "new_message_body",
+                "fieldLabel": "Nova mensagem",
+                "fieldType": "textarea",
+                "requiredField": true
+              }
+            ]
+          },
+          "responseMode": "lastNode"
+        },
+        "webhookId": "141711da-1f29-4d6c-a174-5cc56d74a1c3"
+      },
+      {
+        "id": "43ca3a35-5a24-4202-a630-bc7956052fa6",
+        "name": "Normalize Form Input",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          540,
+          300
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "f1",
+                "name": "edit_token",
+                "value": "={{ $json.token }}",
+                "type": "string"
+              },
+              {
+                "id": "f2",
+                "name": "new_message_body",
+                "value": "={{ $json.new_message_body }}",
+                "type": "string"
+              },
+              {
+                "id": "f3",
+                "name": "edited_by",
+                "value": "anderson",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "97e16d2d-cb0e-4ef0-83bb-d547ef71f3b4",
+        "name": "Save Message Edit (Postgres)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          840,
+          300
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.save_message_edit(\n    p_presented_edit_token => $1,\n    p_new_message_body     => $2,\n    p_edited_by            => $3,\n    p_workflow_name        => 'WF-03-EDIT',\n    p_execution_id         => $4\n);",
+          "options": {
+            "queryReplacement": "={{ [$json.edit_token, $json.new_message_body, $json.edited_by, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "837924ea-f37c-4a34-a606-d620bd586968",
+        "name": "Edit Confirmation",
+        "type": "n8n-nodes-base.form",
+        "typeVersion": 2.5,
+        "position": [
+          1140,
+          300
+        ],
+        "parameters": {
+          "operation": "completion",
+          "respondWith": "text",
+          "completionTitle": "Mensagem atualizada",
+          "completionMessage": "Sua edicao foi salva. Uma nova notificacao de aprovacao sera enviada no Telegram."
+        },
+        "webhookId": "d2c9e8b4-004b-4cd3-a92c-887f7d84d61f"
+      }
+    ],
+    "connections": {
+      "Edit Message Form Trigger": {
+        "main": [
+          [
+            {
+              "node": "Normalize Form Input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize Form Input": {
+        "main": [
+          [
+            {
+              "node": "Save Message Edit (Postgres)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save Message Edit (Postgres)": {
+        "main": [
+          [
+            {
+              "node": "Edit Confirmation",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "id": "poBq03kSHdpPJN34",
+    "name": "WF-03-REGEN - Regenerate Message - Rufino LinkedIn DEV",
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "b9a37568-3204-431d-87f5-ed95c8bb1047",
+        "name": "Regenerate Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "wf03-regen-rufino-linkedin-dev",
+          "authentication": "headerAuth",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "webhookId": "ebc461c3-8bdd-4d9f-9db9-0db495362181"
+      },
+      {
+        "id": "b570e031-db38-423a-b050-91a5782d9752",
+        "name": "Normalize Regeneration Payload",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          540,
+          300
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "g1",
+                "name": "regeneration_token",
+                "value": "={{ $json.body?.regeneration_token ?? \"\" }}",
+                "type": "string"
+              },
+              {
+                "id": "g2",
+                "name": "new_message_body",
+                "value": "={{ $json.body?.new_message_body ?? \"\" }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "11d0d987-2da7-492c-a4cf-fee0c5f3791b",
+        "name": "Validate Regeneration Payload",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          840,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.regeneration_token }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              },
+              {
+                "leftValue": "={{ $json.new_message_body }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        }
+      },
+      {
+        "id": "37e8bc6a-1e0e-477c-a381-015475dbc087",
+        "name": "Save Regenerated Message (Postgres)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1140,
+          220
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.save_regenerated_message(\n    p_presented_regeneration_token => $1,\n    p_new_message_body             => $2,\n    p_actor                        => 'gpt',\n    p_workflow_name                => 'WF-03-REGEN',\n    p_execution_id                 => $3\n);",
+          "options": {
+            "queryReplacement": "={{ [$json.regeneration_token, $json.new_message_body, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "20c033d5-71a0-4378-80a4-c83d943f30c8",
+        "name": "Respond 200 OK",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          1440,
+          220
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {
+            "responseCode": 200
+          }
+        }
+      },
+      {
+        "id": "c45311ac-73c7-4a3c-8301-70fa1b816cca",
+        "name": "Build Validation Error Response",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1140,
+          420
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "e1",
+                "name": "error",
+                "value": "validation_error",
+                "type": "string"
+              },
+              {
+                "id": "e2",
+                "name": "message",
+                "value": "regeneration_token e new_message_body sao obrigatorios",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "a27bd85a-9913-4258-bbae-5fae92ecfd12",
+        "name": "Respond 400 Bad Request",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          1440,
+          420
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {
+            "responseCode": 400
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Regenerate Webhook": {
+        "main": [
+          [
+            {
+              "node": "Normalize Regeneration Payload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize Regeneration Payload": {
+        "main": [
+          [
+            {
+              "node": "Validate Regeneration Payload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Regeneration Payload": {
+        "main": [
+          [
+            {
+              "node": "Save Regenerated Message (Postgres)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build Validation Error Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save Regenerated Message (Postgres)": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 OK",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Validation Error Response": {
+        "main": [
+          [
+            {
+              "node": "Respond 400 Bad Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "id": "J1CFdbxNhICh9MEP",
+    "name": "WF-04 - Delivery Callback - Rufino LinkedIn DEV",
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "90439c3d-b69c-4eca-a9d0-0d4e9e10fe82",
+        "name": "Delivery Callback Trigger",
+        "type": "n8n-nodes-base.telegramTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "updates": [
+            "callback_query"
+          ],
+          "additionalFields": {
+            "chatIds": "<__PLACEHOLDER_VALUE__Chat ID restrito de Anderson (Restrict to Chat IDs)__>",
+            "userIds": "<__PLACEHOLDER_VALUE__User ID restrito de Anderson (Restrict to User IDs)__>"
+          }
+        },
+        "webhookId": "f59a8a99-c64d-4cee-ad7e-a7e791347c5d"
+      },
+      {
+        "id": "2348b760-8c01-4a6f-a8fd-6789ec712d87",
+        "name": "Answer Callback Query",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          540,
+          300
+        ],
+        "parameters": {
+          "resource": "callback",
+          "operation": "answerQuery",
+          "queryId": "={{ $json.callback_query.id }}"
+        },
+        "webhookId": "9a490bb1-75b5-4ffb-aa9c-5a5fa41984f1"
+      },
+      {
+        "id": "334a80b8-97a4-49c5-b776-065466c89d2d",
+        "name": "Parse Callback Data",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          840,
+          300
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "p1",
+                "name": "callback_query_id",
+                "value": "={{ $('Delivery Callback Trigger').item.json.callback_query.id }}",
+                "type": "string"
+              },
+              {
+                "id": "p2",
+                "name": "category",
+                "value": "={{ $('Delivery Callback Trigger').item.json.callback_query.data.split(':')[0] }}",
+                "type": "string"
+              },
+              {
+                "id": "p3",
+                "name": "action_letter",
+                "value": "={{ $('Delivery Callback Trigger').item.json.callback_query.data.split(':')[1] }}",
+                "type": "string"
+              },
+              {
+                "id": "p4",
+                "name": "action_token",
+                "value": "={{ $('Delivery Callback Trigger').item.json.callback_query.data.split(':')[2] }}",
+                "type": "string"
+              },
+              {
+                "id": "p5",
+                "name": "action",
+                "value": "={{ { S: 'MARCAR_ENVIADA', B: 'VOLTAR_EDITAR' }[$('Delivery Callback Trigger').item.json.callback_query.data.split(':')[1]] ?? '' }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "02d6f9e2-976a-441c-9899-cf856ba58b6b",
+        "name": "Is Delivery Category?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1140,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.category }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                },
+                "rightValue": "a"
+              },
+              {
+                "leftValue": "={{ $json.action }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        }
+      },
+      {
+        "id": "76e7cfb3-bf58-4326-96fc-d5df71221128",
+        "name": "Route by Action",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.4,
+        "position": [
+          1440,
+          300
+        ],
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "outputKey": "marcar_enviada",
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.action }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "rightValue": "MARCAR_ENVIADA"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "outputKey": "voltar_editar",
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.action }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "rightValue": "VOLTAR_EDITAR"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "none"
+          }
+        }
+      },
+      {
+        "id": "799753e6-2b70-4251-832c-b97c24294327",
+        "name": "Compute First Followup Date",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1740,
+          180
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": true,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "ff1",
+                "name": "first_followup_at",
+                "value": "={{ $now.plus(3, 'days').toISO() }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "62ce1b0d-8939-4558-9513-11a1840c51c9",
+        "name": "Mark Message Sent (Enviada)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          2040,
+          180
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.mark_message_sent(\n    p_action_token       => $1,\n    p_action             => 'MARCAR_ENVIADA',\n    p_actor              => 'telegram:anderson',\n    p_callback_query_id  => $2,\n    p_first_followup_at  => $3::timestamptz,\n    p_workflow_name      => 'WF-04',\n    p_execution_id       => $4\n);",
+          "options": {
+            "queryReplacement": "={{ [$json.action_token, $json.callback_query_id, $json.first_followup_at, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "1f938f7e-c363-414e-9bde-0118edaaa1fb",
+        "name": "Remove Original Inline Buttons",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2340,
+          300
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "editMessageText",
+          "chatId": "={{ $('Delivery Callback Trigger').item.json.callback_query.message.chat.id }}",
+          "messageId": "={{ $('Delivery Callback Trigger').item.json.callback_query.message.message_id }}",
+          "text": "={{ $('Delivery Callback Trigger').item.json.callback_query.message.text }}",
+          "replyMarkup": "none"
+        },
+        "webhookId": "39d9066a-8c22-440d-b3b6-5648ec41d5e1"
+      },
+      {
+        "id": "0c6e6077-0953-40c5-a7fa-8fdee6d2e18c",
+        "name": "Mark Message Sent (Voltar Editar)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1740,
+          420
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.mark_message_sent(\n    p_action_token       => $1,\n    p_action             => 'VOLTAR_EDITAR',\n    p_actor              => 'telegram:anderson',\n    p_callback_query_id  => $2,\n    p_workflow_name      => 'WF-04',\n    p_execution_id       => $3\n);",
+          "options": {
+            "queryReplacement": "={{ [$json.action_token, $json.callback_query_id, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Delivery Callback Trigger": {
+        "main": [
+          [
+            {
+              "node": "Answer Callback Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Answer Callback Query": {
+        "main": [
+          [
+            {
+              "node": "Parse Callback Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Callback Data": {
+        "main": [
+          [
+            {
+              "node": "Is Delivery Category?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Delivery Category?": {
+        "main": [
+          [
+            {
+              "node": "Route by Action",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route by Action": {
+        "main": [
+          [
+            {
+              "node": "Compute First Followup Date",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Mark Message Sent (Voltar Editar)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Compute First Followup Date": {
+        "main": [
+          [
+            {
+              "node": "Mark Message Sent (Enviada)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Mark Message Sent (Enviada)": {
+        "main": [
+          [
+            {
+              "node": "Remove Original Inline Buttons",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Mark Message Sent (Voltar Editar)": {
+        "main": [
+          [
+            {
+              "node": "Remove Original Inline Buttons",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "id": "W36Y8pew9wwaCb6d",
+    "name": "WF-05 - Follow-up - Rufino LinkedIn DEV",
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "21a20569-0342-4914-bdf4-9d00f37c72ed",
+        "name": "Followup Check Schedule",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          240,
+          200
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "dd63eabd-cc07-4ce1-aa40-f8f229219664",
+        "name": "Claim Due Followups",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          540,
+          200
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.claim_due_followups(\n    p_limit         => 50,\n    p_workflow_name => 'WF-05',\n    p_execution_id  => $1\n);",
+          "options": {
+            "queryReplacement": "={{ [$execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "06f202e5-4add-4ff3-a511-4c894c19df5c",
+        "name": "Build Followup Reminder",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          840,
+          200
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": true,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "r1",
+                "name": "telegram_chat_id",
+                "value": "<__PLACEHOLDER_VALUE__Chat ID do Telegram de Anderson (ex.: 123456789)__>",
+                "type": "string"
+              },
+              {
+                "id": "r2",
+                "name": "telegram_text",
+                "value": "={{ \"Follow-up pendente: a conexao respondeu (sequence \" + $json.sequence + \")?\" }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "6ac573d5-4156-4028-945b-cdce308f01dd",
+        "name": "Send Followup Reminder",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1140,
+          200
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "sendMessage",
+          "chatId": "={{ $json.telegram_chat_id }}",
+          "text": "={{ $json.telegram_text }}",
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "Respondeu",
+                      "additionalFields": {
+                        "callback_data": "={{ \"f:R:\" + $json.raw_claim_token }}"
+                      }
+                    },
+                    {
+                      "text": "Sem resposta",
+                      "additionalFields": {
+                        "callback_data": "={{ \"f:N:\" + $json.raw_claim_token }}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "webhookId": "7d5125d8-fb69-4410-8233-288a57be68ed"
+      },
+      {
+        "id": "92811d02-9369-4d7e-95aa-5bc026e46e8c",
+        "name": "Followup Callback Trigger",
+        "type": "n8n-nodes-base.telegramTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          240,
+          500
+        ],
+        "parameters": {
+          "updates": [
+            "callback_query"
+          ],
+          "additionalFields": {
+            "chatIds": "<__PLACEHOLDER_VALUE__Chat ID restrito de Anderson (Restrict to Chat IDs)__>",
+            "userIds": "<__PLACEHOLDER_VALUE__User ID restrito de Anderson (Restrict to User IDs)__>"
+          }
+        },
+        "webhookId": "f30c71fb-c3ec-4e67-aadf-90ff9a55d31e"
+      },
+      {
+        "id": "1e6c0535-a246-4ad9-badd-ba3686a03b85",
+        "name": "Answer Followup Callback Query",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          540,
+          500
+        ],
+        "parameters": {
+          "resource": "callback",
+          "operation": "answerQuery",
+          "queryId": "={{ $json.callback_query.id }}"
+        },
+        "webhookId": "74867dbb-1a07-4644-81a7-8de08f6c2ac6"
+      },
+      {
+        "id": "679e238c-4d1a-4184-995e-41e438dfbf2e",
+        "name": "Parse Followup Callback Data",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          840,
+          500
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "q1",
+                "name": "callback_query_id",
+                "value": "={{ $('Followup Callback Trigger').item.json.callback_query.id }}",
+                "type": "string"
+              },
+              {
+                "id": "q2",
+                "name": "category",
+                "value": "={{ $('Followup Callback Trigger').item.json.callback_query.data.split(':')[0] }}",
+                "type": "string"
+              },
+              {
+                "id": "q3",
+                "name": "action_letter",
+                "value": "={{ $('Followup Callback Trigger').item.json.callback_query.data.split(':')[1] }}",
+                "type": "string"
+              },
+              {
+                "id": "q4",
+                "name": "claim_token",
+                "value": "={{ $('Followup Callback Trigger').item.json.callback_query.data.split(':')[2] }}",
+                "type": "string"
+              },
+              {
+                "id": "q5",
+                "name": "resultado",
+                "value": "={{ { R: 'RESPONDEU', N: 'SEM_RESPOSTA' }[$('Followup Callback Trigger').item.json.callback_query.data.split(':')[1]] ?? '' }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "0618fb01-2bbf-48b5-a444-798e126fb6c7",
+        "name": "Is Followup Category?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1140,
+          500
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.category }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                },
+                "rightValue": "f"
+              },
+              {
+                "leftValue": "={{ $json.resultado }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        }
+      },
+      {
+        "id": "441d36fd-eca8-4058-ae39-e24877beff3e",
+        "name": "Route by Resultado",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.4,
+        "position": [
+          1440,
+          500
+        ],
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "outputKey": "respondeu",
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.resultado }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "rightValue": "RESPONDEU"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "outputKey": "sem_resposta",
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.resultado }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "rightValue": "SEM_RESPOSTA"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "none"
+          }
+        }
+      },
+      {
+        "id": "5ce83c64-45d6-4b73-bf36-b1758c63b55b",
+        "name": "Complete Followup (Respondeu)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1740,
+          420
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.complete_followup(\n    p_claim_token       => $1,\n    p_resultado         => 'RESPONDEU',\n    p_actor             => 'anderson',\n    p_callback_query_id => $2,\n    p_workflow_name     => 'WF-05',\n    p_execution_id      => $3\n);",
+          "options": {
+            "queryReplacement": "={{ [$json.claim_token, $json.callback_query_id, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      },
+      {
+        "id": "831bc2f6-4f69-4db1-ba03-2d0f48cd2590",
+        "name": "Remove Followup Inline Buttons",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2340,
+          500
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "editMessageText",
+          "chatId": "={{ $('Followup Callback Trigger').item.json.callback_query.message.chat.id }}",
+          "messageId": "={{ $('Followup Callback Trigger').item.json.callback_query.message.message_id }}",
+          "text": "={{ $('Followup Callback Trigger').item.json.callback_query.message.text }}",
+          "replyMarkup": "none"
+        },
+        "webhookId": "c200104c-ffdb-41f5-9c1d-27f2e33acf69"
+      },
+      {
+        "id": "645d6345-9184-4c6e-ae3c-46e5636f295b",
+        "name": "Compute Next Followup Date",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1740,
+          580
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": true,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "n1",
+                "name": "next_followup_at",
+                "value": "={{ $now.plus(3, 'days').toISO() }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "0a966e1d-7693-4bb0-bed3-46bdc3c56db0",
+        "name": "Complete Followup (Sem Resposta)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          2040,
+          580
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.complete_followup(\n    p_claim_token       => $1,\n    p_resultado         => 'SEM_RESPOSTA',\n    p_actor             => 'anderson',\n    p_callback_query_id => $2,\n    p_next_followup_at  => $3::timestamptz,\n    p_workflow_name     => 'WF-05',\n    p_execution_id      => $4\n);",
+          "options": {
+            "queryReplacement": "={{ [$json.claim_token, $json.callback_query_id, $json.next_followup_at, $execution.id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Followup Check Schedule": {
+        "main": [
+          [
+            {
+              "node": "Claim Due Followups",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claim Due Followups": {
+        "main": [
+          [
+            {
+              "node": "Build Followup Reminder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Followup Reminder": {
+        "main": [
+          [
+            {
+              "node": "Send Followup Reminder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Followup Callback Trigger": {
+        "main": [
+          [
+            {
+              "node": "Answer Followup Callback Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Answer Followup Callback Query": {
+        "main": [
+          [
+            {
+              "node": "Parse Followup Callback Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Followup Callback Data": {
+        "main": [
+          [
+            {
+              "node": "Is Followup Category?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Followup Category?": {
+        "main": [
+          [
+            {
+              "node": "Route by Resultado",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route by Resultado": {
+        "main": [
+          [
+            {
+              "node": "Complete Followup (Respondeu)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Compute Next Followup Date",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Complete Followup (Respondeu)": {
+        "main": [
+          [
+            {
+              "node": "Remove Followup Inline Buttons",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Compute Next Followup Date": {
+        "main": [
+          [
+            {
+              "node": "Complete Followup (Sem Resposta)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Complete Followup (Sem Resposta)": {
+        "main": [
+          [
+            {
+              "node": "Remove Followup Inline Buttons",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "id": "ASUyxPvFJUmRoWO9",
+    "name": "WF-90 - Error Handler - Rufino LinkedIn DEV",
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "ad2f467a-a406-4aec-a49a-ed8764ac7946",
+        "name": "Error Trigger",
+        "type": "n8n-nodes-base.errorTrigger",
+        "typeVersion": 1,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {}
+      },
+      {
+        "id": "9362c3a6-672a-4504-a478-7da3c803ce85",
+        "name": "Sanitize Error Context",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          540,
+          300
+        ],
+        "parameters": {
+          "mode": "manual",
+          "includeOtherFields": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "s1",
+                "name": "source_workflow",
+                "value": "={{ $json.workflow?.name ?? \"desconhecido\" }}",
+                "type": "string"
+              },
+              {
+                "id": "s2",
+                "name": "error_type",
+                "value": "={{ $json.execution?.lastNodeExecuted ?? \"erro_nao_identificado\" }}",
+                "type": "string"
+              },
+              {
+                "id": "s3",
+                "name": "error_message",
+                "value": "={{ ($json.execution?.error?.message ?? \"erro sem mensagem\").slice(0, 500) }}",
+                "type": "string"
+              },
+              {
+                "id": "s4",
+                "name": "context",
+                "value": "={{ { last_node_executed: $json.execution?.lastNodeExecuted ?? null, mode: $json.execution?.mode ?? null, execution_url: $json.execution?.url ?? null } }}",
+                "type": "object"
+              },
+              {
+                "id": "s5",
+                "name": "execution_id",
+                "value": "={{ $json.execution?.id ?? $execution.id }}",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "4d476cfc-10a8-48ff-b4c9-941f038db847",
+        "name": "Record Workflow Error (Postgres)",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          840,
+          300
+        ],
+        "parameters": {
+          "resource": "database",
+          "operation": "executeQuery",
+          "query": "SELECT * FROM rufino_linkedin.record_workflow_error(\n    p_connection_id             => NULL,\n    p_source_workflow           => $1,\n    p_error_type                => $2,\n    p_error_message             => $3,\n    p_context                   => $4::jsonb,\n    p_previous_status           => NULL,\n    p_recommended_resume_status => NULL,\n    p_retry_limit               => 3,\n    p_execution_id              => $5\n);",
+          "options": {
+            "queryReplacement": "={{ [$json.source_workflow, $json.error_type, $json.error_message, JSON.stringify($json.context), $json.execution_id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "DgnSAHo0I8CRFwci",
+            "name": "Rufino LinkedIn DEV"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Error Trigger": {
+        "main": [
+          [
+            {
+              "node": "Sanitize Error Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sanitize Error Context": {
+        "main": [
+          [
+            {
+              "node": "Record Workflow Error (Postgres)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+]

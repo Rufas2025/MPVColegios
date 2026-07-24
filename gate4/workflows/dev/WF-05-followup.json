@@ -1,0 +1,220 @@
+{
+  "id": "W36Y8pew9wwaCb6d",
+  "name": "WF-05 - Follow-up - Rufino LinkedIn DEV",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "id": "21a20569-0342-4914-bdf4-9d00f37c72ed",
+      "name": "Followup Check Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [240, 200],
+      "parameters": { "rule": { "interval": [{ "field": "hours", "hoursInterval": 1 }] } }
+    },
+    {
+      "id": "dd63eabd-cc07-4ce1-aa40-f8f229219664",
+      "name": "Claim Due Followups",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [540, 200],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.claim_due_followups(\n    p_limit         => 50,\n    p_workflow_name => 'WF-05',\n    p_execution_id  => $1\n);",
+        "options": { "queryReplacement": "={{ [$execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "06f202e5-4add-4ff3-a511-4c894c19df5c",
+      "name": "Build Followup Reminder",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [840, 200],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            { "id": "r1", "name": "telegram_chat_id", "value": "<__PLACEHOLDER_VALUE__Chat ID do Telegram de Anderson (ex.: 123456789)__>", "type": "string" },
+            { "id": "r2", "name": "telegram_text", "value": "={{ \"Follow-up pendente: a conexao respondeu (sequence \" + $json.sequence + \")?\" }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6ac573d5-4156-4028-945b-cdce308f01dd",
+      "name": "Send Followup Reminder",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1140, 200],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.telegram_chat_id }}",
+        "text": "={{ $json.telegram_text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [ { "row": { "buttons": [
+            { "text": "Respondeu", "additionalFields": { "callback_data": "={{ \"f:R:\" + $json.raw_claim_token }}" } },
+            { "text": "Sem resposta", "additionalFields": { "callback_data": "={{ \"f:N:\" + $json.raw_claim_token }}" } }
+          ] } } ]
+        },
+        "additionalFields": { "appendAttribution": false }
+      },
+      "webhookId": "7d5125d8-fb69-4410-8233-288a57be68ed"
+    },
+    {
+      "id": "92811d02-9369-4d7e-95aa-5bc026e46e8c",
+      "name": "Followup Callback Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.3,
+      "position": [240, 500],
+      "parameters": {
+        "updates": ["callback_query"],
+        "additionalFields": {
+          "chatIds": "<__PLACEHOLDER_VALUE__Chat ID restrito de Anderson (Restrict to Chat IDs)__>",
+          "userIds": "<__PLACEHOLDER_VALUE__User ID restrito de Anderson (Restrict to User IDs)__>"
+        }
+      },
+      "webhookId": "f30c71fb-c3ec-4e67-aadf-90ff9a55d31e"
+    },
+    {
+      "id": "1e6c0535-a246-4ad9-badd-ba3686a03b85",
+      "name": "Answer Followup Callback Query",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [540, 500],
+      "parameters": { "resource": "callback", "operation": "answerQuery", "queryId": "={{ $json.callback_query.id }}" },
+      "webhookId": "74867dbb-1a07-4644-81a7-8de08f6c2ac6"
+    },
+    {
+      "id": "679e238c-4d1a-4184-995e-41e438dfbf2e",
+      "name": "Parse Followup Callback Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [840, 500],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "q1", "name": "callback_query_id", "value": "={{ $('Followup Callback Trigger').item.json.callback_query.id }}", "type": "string" },
+            { "id": "q2", "name": "category", "value": "={{ $('Followup Callback Trigger').item.json.callback_query.data.split(':')[0] }}", "type": "string" },
+            { "id": "q3", "name": "action_letter", "value": "={{ $('Followup Callback Trigger').item.json.callback_query.data.split(':')[1] }}", "type": "string" },
+            { "id": "q4", "name": "claim_token", "value": "={{ $('Followup Callback Trigger').item.json.callback_query.data.split(':')[2] }}", "type": "string" },
+            { "id": "q5", "name": "resultado", "value": "={{ { R: 'RESPONDEU', N: 'SEM_RESPOSTA' }[$('Followup Callback Trigger').item.json.callback_query.data.split(':')[1]] ?? '' }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0618fb01-2bbf-48b5-a444-798e126fb6c7",
+      "name": "Is Followup Category?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1140, 500],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{ $json.category }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "f" },
+            { "leftValue": "={{ $json.resultado }}", "operator": { "type": "string", "operation": "notEmpty" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "441d36fd-eca8-4058-ae39-e24877beff3e",
+      "name": "Route by Resultado",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [1440, 500],
+      "parameters": {
+        "rules": {
+          "values": [
+            { "outputKey": "respondeu", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.resultado }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "RESPONDEU" }], "combinator": "and" } },
+            { "outputKey": "sem_resposta", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.resultado }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "SEM_RESPOSTA" }], "combinator": "and" } }
+          ]
+        },
+        "options": { "fallbackOutput": "none" }
+      }
+    },
+    {
+      "id": "5ce83c64-45d6-4b73-bf36-b1758c63b55b",
+      "name": "Complete Followup (Respondeu)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1740, 420],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.complete_followup(\n    p_claim_token       => $1,\n    p_resultado         => 'RESPONDEU',\n    p_actor             => 'anderson',\n    p_callback_query_id => $2,\n    p_workflow_name     => 'WF-05',\n    p_execution_id      => $3\n);",
+        "options": { "queryReplacement": "={{ [$json.claim_token, $json.callback_query_id, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "831bc2f6-4f69-4db1-ba03-2d0f48cd2590",
+      "name": "Remove Followup Inline Buttons",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2340, 500],
+      "parameters": {
+        "resource": "message",
+        "operation": "editMessageText",
+        "chatId": "={{ $('Followup Callback Trigger').item.json.callback_query.message.chat.id }}",
+        "messageId": "={{ $('Followup Callback Trigger').item.json.callback_query.message.message_id }}",
+        "text": "={{ $('Followup Callback Trigger').item.json.callback_query.message.text }}",
+        "replyMarkup": "none"
+      },
+      "webhookId": "c200104c-ffdb-41f5-9c1d-27f2e33acf69"
+    },
+    {
+      "id": "645d6345-9184-4c6e-ae3c-46e5636f295b",
+      "name": "Compute Next Followup Date",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1740, 580],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": { "assignments": [ { "id": "n1", "name": "next_followup_at", "value": "={{ $now.plus(3, 'days').toISO() }}", "type": "string" } ] }
+      }
+    },
+    {
+      "id": "0a966e1d-7693-4bb0-bed3-46bdc3c56db0",
+      "name": "Complete Followup (Sem Resposta)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [2040, 580],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.complete_followup(\n    p_claim_token       => $1,\n    p_resultado         => 'SEM_RESPOSTA',\n    p_actor             => 'anderson',\n    p_callback_query_id => $2,\n    p_next_followup_at  => $3::timestamptz,\n    p_workflow_name     => 'WF-05',\n    p_execution_id      => $4\n);",
+        "options": { "queryReplacement": "={{ [$json.claim_token, $json.callback_query_id, $json.next_followup_at, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    }
+  ],
+  "connections": {
+    "Followup Check Schedule": { "main": [[ { "node": "Claim Due Followups", "type": "main", "index": 0 } ]] },
+    "Claim Due Followups": { "main": [[ { "node": "Build Followup Reminder", "type": "main", "index": 0 } ]] },
+    "Build Followup Reminder": { "main": [[ { "node": "Send Followup Reminder", "type": "main", "index": 0 } ]] },
+    "Followup Callback Trigger": { "main": [[ { "node": "Answer Followup Callback Query", "type": "main", "index": 0 } ]] },
+    "Answer Followup Callback Query": { "main": [[ { "node": "Parse Followup Callback Data", "type": "main", "index": 0 } ]] },
+    "Parse Followup Callback Data": { "main": [[ { "node": "Is Followup Category?", "type": "main", "index": 0 } ]] },
+    "Is Followup Category?": { "main": [[ { "node": "Route by Resultado", "type": "main", "index": 0 } ]] },
+    "Route by Resultado": {
+      "main": [
+        [ { "node": "Complete Followup (Respondeu)", "type": "main", "index": 0 } ],
+        [ { "node": "Compute Next Followup Date", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Complete Followup (Respondeu)": { "main": [[ { "node": "Remove Followup Inline Buttons", "type": "main", "index": 0 } ]] },
+    "Compute Next Followup Date": { "main": [[ { "node": "Complete Followup (Sem Resposta)", "type": "main", "index": 0 } ]] },
+    "Complete Followup (Sem Resposta)": { "main": [[ { "node": "Remove Followup Inline Buttons", "type": "main", "index": 0 } ]] }
+  }
+}

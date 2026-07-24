@@ -1,0 +1,156 @@
+{
+  "id": "J1CFdbxNhICh9MEP",
+  "name": "WF-04 - Delivery Callback - Rufino LinkedIn DEV",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "id": "90439c3d-b69c-4eca-a9d0-0d4e9e10fe82",
+      "name": "Delivery Callback Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.3,
+      "position": [240, 300],
+      "parameters": {
+        "updates": ["callback_query"],
+        "additionalFields": {
+          "chatIds": "<__PLACEHOLDER_VALUE__Chat ID restrito de Anderson (Restrict to Chat IDs)__>",
+          "userIds": "<__PLACEHOLDER_VALUE__User ID restrito de Anderson (Restrict to User IDs)__>"
+        }
+      },
+      "webhookId": "f59a8a99-c64d-4cee-ad7e-a7e791347c5d"
+    },
+    {
+      "id": "2348b760-8c01-4a6f-a8fd-6789ec712d87",
+      "name": "Answer Callback Query",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [540, 300],
+      "parameters": { "resource": "callback", "operation": "answerQuery", "queryId": "={{ $json.callback_query.id }}" },
+      "webhookId": "9a490bb1-75b5-4ffb-aa9c-5a5fa41984f1"
+    },
+    {
+      "id": "334a80b8-97a4-49c5-b776-065466c89d2d",
+      "name": "Parse Callback Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [840, 300],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "p1", "name": "callback_query_id", "value": "={{ $('Delivery Callback Trigger').item.json.callback_query.id }}", "type": "string" },
+            { "id": "p2", "name": "category", "value": "={{ $('Delivery Callback Trigger').item.json.callback_query.data.split(':')[0] }}", "type": "string" },
+            { "id": "p3", "name": "action_letter", "value": "={{ $('Delivery Callback Trigger').item.json.callback_query.data.split(':')[1] }}", "type": "string" },
+            { "id": "p4", "name": "action_token", "value": "={{ $('Delivery Callback Trigger').item.json.callback_query.data.split(':')[2] }}", "type": "string" },
+            { "id": "p5", "name": "action", "value": "={{ { S: 'MARCAR_ENVIADA', B: 'VOLTAR_EDITAR' }[$('Delivery Callback Trigger').item.json.callback_query.data.split(':')[1]] ?? '' }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "02d6f9e2-976a-441c-9899-cf856ba58b6b",
+      "name": "Is Delivery Category?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1140, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{ $json.category }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "a" },
+            { "leftValue": "={{ $json.action }}", "operator": { "type": "string", "operation": "notEmpty" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "76e7cfb3-bf58-4326-96fc-d5df71221128",
+      "name": "Route by Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [1440, 300],
+      "parameters": {
+        "rules": {
+          "values": [
+            { "outputKey": "marcar_enviada", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "MARCAR_ENVIADA" }], "combinator": "and" } },
+            { "outputKey": "voltar_editar", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "VOLTAR_EDITAR" }], "combinator": "and" } }
+          ]
+        },
+        "options": { "fallbackOutput": "none" }
+      }
+    },
+    {
+      "id": "799753e6-2b70-4251-832c-b97c24294327",
+      "name": "Compute First Followup Date",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1740, 180],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": { "assignments": [ { "id": "ff1", "name": "first_followup_at", "value": "={{ $now.plus(3, 'days').toISO() }}", "type": "string" } ] }
+      }
+    },
+    {
+      "id": "62ce1b0d-8939-4558-9513-11a1840c51c9",
+      "name": "Mark Message Sent (Enviada)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [2040, 180],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.mark_message_sent(\n    p_action_token       => $1,\n    p_action             => 'MARCAR_ENVIADA',\n    p_actor              => 'telegram:anderson',\n    p_callback_query_id  => $2,\n    p_first_followup_at  => $3::timestamptz,\n    p_workflow_name      => 'WF-04',\n    p_execution_id       => $4\n);",
+        "options": { "queryReplacement": "={{ [$json.action_token, $json.callback_query_id, $json.first_followup_at, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "1f938f7e-c363-414e-9bde-0118edaaa1fb",
+      "name": "Remove Original Inline Buttons",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2340, 300],
+      "parameters": {
+        "resource": "message",
+        "operation": "editMessageText",
+        "chatId": "={{ $('Delivery Callback Trigger').item.json.callback_query.message.chat.id }}",
+        "messageId": "={{ $('Delivery Callback Trigger').item.json.callback_query.message.message_id }}",
+        "text": "={{ $('Delivery Callback Trigger').item.json.callback_query.message.text }}",
+        "replyMarkup": "none"
+      },
+      "webhookId": "39d9066a-8c22-440d-b3b6-5648ec41d5e1"
+    },
+    {
+      "id": "0c6e6077-0953-40c5-a7fa-8fdee6d2e18c",
+      "name": "Mark Message Sent (Voltar Editar)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1740, 420],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.mark_message_sent(\n    p_action_token       => $1,\n    p_action             => 'VOLTAR_EDITAR',\n    p_actor              => 'telegram:anderson',\n    p_callback_query_id  => $2,\n    p_workflow_name      => 'WF-04',\n    p_execution_id       => $3\n);",
+        "options": { "queryReplacement": "={{ [$json.action_token, $json.callback_query_id, $execution.id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    }
+  ],
+  "connections": {
+    "Delivery Callback Trigger": { "main": [[ { "node": "Answer Callback Query", "type": "main", "index": 0 } ]] },
+    "Answer Callback Query": { "main": [[ { "node": "Parse Callback Data", "type": "main", "index": 0 } ]] },
+    "Parse Callback Data": { "main": [[ { "node": "Is Delivery Category?", "type": "main", "index": 0 } ]] },
+    "Is Delivery Category?": { "main": [[ { "node": "Route by Action", "type": "main", "index": 0 } ]] },
+    "Route by Action": {
+      "main": [
+        [ { "node": "Compute First Followup Date", "type": "main", "index": 0 } ],
+        [ { "node": "Mark Message Sent (Voltar Editar)", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Compute First Followup Date": { "main": [[ { "node": "Mark Message Sent (Enviada)", "type": "main", "index": 0 } ]] },
+    "Mark Message Sent (Enviada)": { "main": [[ { "node": "Remove Original Inline Buttons", "type": "main", "index": 0 } ]] },
+    "Mark Message Sent (Voltar Editar)": { "main": [[ { "node": "Remove Original Inline Buttons", "type": "main", "index": 0 } ]] }
+  }
+}

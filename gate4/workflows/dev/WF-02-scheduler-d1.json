@@ -1,0 +1,47 @@
+{
+  "id": "CxLUUmLpj3mA0nfz",
+  "name": "WF-02 - Scheduler D+1 - Rufino LinkedIn DEV",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "id": "3bb44228-bb85-443b-84ca-9efbb40b34b2",
+      "name": "D+1 Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "days", "daysInterval": 1, "triggerAtHour": 9, "triggerAtMinute": 0 }
+          ]
+        }
+      }
+    },
+    {
+      "id": "dc0c25d3-709e-4ca3-a733-cf286a93a1c1",
+      "name": "Claim Due Connections (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [540, 300],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.claim_due_connections(\n    p_limit         => 50,\n    p_workflow_name => 'WF-02',\n    p_execution_id  => $1\n);",
+        "options": {
+          "queryReplacement": "={{ [$execution.id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" }
+      }
+    }
+  ],
+  "connections": {
+    "D+1 Daily Schedule": {
+      "main": [[ { "node": "Claim Due Connections (Postgres)", "type": "main", "index": 0 } ]]
+    }
+  }
+}

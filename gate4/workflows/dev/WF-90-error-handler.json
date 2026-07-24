@@ -1,0 +1,54 @@
+{
+  "id": "ASUyxPvFJUmRoWO9",
+  "name": "WF-90 - Error Handler - Rufino LinkedIn DEV",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "id": "ad2f467a-a406-4aec-a49a-ed8764ac7946",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "9362c3a6-672a-4504-a478-7da3c803ce85",
+      "name": "Sanitize Error Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [540, 300],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "s1", "name": "source_workflow", "value": "={{ $json.workflow?.name ?? \"desconhecido\" }}", "type": "string" },
+            { "id": "s2", "name": "error_type", "value": "={{ $json.execution?.lastNodeExecuted ?? \"erro_nao_identificado\" }}", "type": "string" },
+            { "id": "s3", "name": "error_message", "value": "={{ ($json.execution?.error?.message ?? \"erro sem mensagem\").slice(0, 500) }}", "type": "string" },
+            { "id": "s4", "name": "context", "value": "={{ { last_node_executed: $json.execution?.lastNodeExecuted ?? null, mode: $json.execution?.mode ?? null, execution_url: $json.execution?.url ?? null } }}", "type": "object" },
+            { "id": "s5", "name": "execution_id", "value": "={{ $json.execution?.id ?? $execution.id }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4d476cfc-10a8-48ff-b4c9-941f038db847",
+      "name": "Record Workflow Error (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [840, 300],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.record_workflow_error(\n    p_connection_id             => NULL,\n    p_source_workflow           => $1,\n    p_error_type                => $2,\n    p_error_message             => $3,\n    p_context                   => $4::jsonb,\n    p_previous_status           => NULL,\n    p_recommended_resume_status => NULL,\n    p_retry_limit               => 3,\n    p_execution_id              => $5\n);",
+        "options": { "queryReplacement": "={{ [$json.source_workflow, $json.error_type, $json.error_message, JSON.stringify($json.context), $json.execution_id] }}" }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    }
+  ],
+  "connections": {
+    "Error Trigger": { "main": [[ { "node": "Sanitize Error Context", "type": "main", "index": 0 } ]] },
+    "Sanitize Error Context": { "main": [[ { "node": "Record Workflow Error (Postgres)", "type": "main", "index": 0 } ]] }
+  }
+}

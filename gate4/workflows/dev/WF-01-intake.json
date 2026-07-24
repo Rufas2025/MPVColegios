@@ -1,0 +1,160 @@
+{
+  "name": "WF-01 - Intake - Rufino LinkedIn DEV",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "id": "a1b1c1d1-0001-4000-8000-000000000001",
+      "name": "Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [240, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf01-intake-rufino-linkedin-dev",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b1c1d1-0001-4000-8000-000000000002",
+      "name": "Normalize Intake Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [540, 300],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "connection_id", "value": "={{ $json.body?.connection_id ?? \"\" }}", "type": "string" },
+            { "id": "a2", "name": "idempotency_key", "value": "={{ $json.body?.connection_id ?? \"\" }}", "type": "string" },
+            { "id": "a3", "name": "nome", "value": "={{ $json.body?.nome ?? \"\" }}", "type": "string" },
+            { "id": "a4", "name": "primeiro_nome", "value": "={{ $json.body?.primeiro_nome ?? \"\" }}", "type": "string" },
+            { "id": "a5", "name": "cargo", "value": "={{ $json.body?.cargo ?? \"\" }}", "type": "string" },
+            { "id": "a6", "name": "instituicao", "value": "={{ $json.body?.instituicao ?? \"\" }}", "type": "string" },
+            { "id": "a7", "name": "cidade", "value": "={{ $json.body?.cidade ?? null }}", "type": "string" },
+            { "id": "a8", "name": "profile_url", "value": "={{ $json.body?.profile_url ?? \"\" }}", "type": "string" },
+            { "id": "a9", "name": "conversation_url", "value": "={{ $json.body?.conversation_url ?? null }}", "type": "string" },
+            { "id": "a10", "name": "data_conexao", "value": "={{ $json.body?.data_conexao ?? \"\" }}", "type": "string" },
+            { "id": "a11", "name": "resumo", "value": "={{ $json.body?.resumo ?? \"\" }}", "type": "string" },
+            { "id": "a12", "name": "ganchos", "value": "={{ $json.body?.ganchos ?? [] }}", "type": "array" },
+            { "id": "a13", "name": "melhor_gancho", "value": "={{ $json.body?.melhor_gancho ?? \"\" }}", "type": "string" },
+            { "id": "a14", "name": "justificativa", "value": "={{ $json.body?.justificativa ?? \"\" }}", "type": "string" },
+            { "id": "a15", "name": "mensagem", "value": "={{ $json.body?.mensagem ?? \"\" }}", "type": "string" },
+            { "id": "a16", "name": "confianca", "value": "={{ $json.body?.confianca ?? 0 }}", "type": "number" },
+            { "id": "a17", "name": "sensivel", "value": "={{ $json.body?.sensivel ?? false }}", "type": "boolean" },
+            { "id": "a18", "name": "alertas", "value": "={{ $json.body?.alertas ?? [] }}", "type": "array" },
+            { "id": "a19", "name": "brain_version", "value": "={{ $json.body?.brain_version ?? \"\" }}", "type": "string" },
+            { "id": "a20", "name": "delivery_mode", "value": "={{ $json.body?.delivery_mode ?? \"\" }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1b1c1d1-0001-4000-8000-000000000003",
+      "name": "Validate Required Fields",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [840, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{ $json.nome }}", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{ $json.primeiro_nome }}", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{ $json.profile_url }}", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{ $json.data_conexao }}", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{ $json.mensagem }}", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{ $json.delivery_mode }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "MANUAL_ASSISTED" }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "a1b1c1d1-0001-4000-8000-000000000004",
+      "name": "Register Connection (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1140, 220],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rufino_linkedin.register_connection(\n    p_idempotency_key  => $1,\n    p_nome             => $2,\n    p_primeiro_nome    => $3,\n    p_cargo            => $4,\n    p_instituicao      => $5,\n    p_cidade           => $6,\n    p_profile_url      => $7,\n    p_conversation_url => $8,\n    p_data_conexao     => $9::date,\n    p_resumo           => $10,\n    p_ganchos          => $11::jsonb,\n    p_melhor_gancho    => $12,\n    p_justificativa    => $13,\n    p_confianca        => $14::numeric,\n    p_sensivel         => $15::boolean,\n    p_alertas          => $16::jsonb,\n    p_brain_version    => $17,\n    p_mensagem         => $18,\n    p_workflow_name    => 'WF-01',\n    p_execution_id     => $19\n);",
+        "options": {
+          "queryReplacement": "={{ [$json.idempotency_key, $json.nome, $json.primeiro_nome, $json.cargo, $json.instituicao, $json.cidade, $json.profile_url, $json.conversation_url, $json.data_conexao, $json.resumo, JSON.stringify($json.ganchos), $json.melhor_gancho, $json.justificativa, $json.confianca, $json.sensivel, JSON.stringify($json.alertas), $json.brain_version, $json.mensagem, $execution.id] }}"
+        }
+      },
+      "credentials": { "postgres": { "id": "DgnSAHo0I8CRFwci", "name": "Rufino LinkedIn DEV" } }
+    },
+    {
+      "id": "a1b1c1d1-0001-4000-8000-000000000005",
+      "name": "Build Success Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1440, 220],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "r1", "name": "connection_id", "value": "={{ $json.connection_id }}", "type": "string" },
+            { "id": "r2", "name": "status", "value": "={{ $json.status }}", "type": "string" },
+            { "id": "r3", "name": "scheduled_at", "value": "={{ $json.scheduled_at }}", "type": "string" },
+            { "id": "r4", "name": "message_version_id", "value": "={{ $json.message_version_id }}", "type": "string" },
+            { "id": "r5", "name": "already_existed", "value": "={{ $json.already_existed }}", "type": "boolean" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1b1c1d1-0001-4000-8000-000000000006",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1740, 220],
+      "parameters": { "respondWith": "json", "responseBody": "={{ $json }}", "options": { "responseCode": 200 } }
+    },
+    {
+      "id": "a1b1c1d1-0001-4000-8000-000000000007",
+      "name": "Build Validation Error Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1140, 420],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "e1", "name": "error", "value": "validation_error", "type": "string" },
+            { "id": "e2", "name": "message", "value": "Payload invalido: campo obrigatorio ausente ou delivery_mode nao suportado (so MANUAL_ASSISTED nesta versao)", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1b1c1d1-0001-4000-8000-000000000008",
+      "name": "Respond 400 Bad Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1440, 420],
+      "parameters": { "respondWith": "json", "responseBody": "={{ $json }}", "options": { "responseCode": 400 } }
+    }
+  ],
+  "connections": {
+    "Intake Webhook": { "main": [[ { "node": "Normalize Intake Payload", "type": "main", "index": 0 } ]] },
+    "Normalize Intake Payload": { "main": [[ { "node": "Validate Required Fields", "type": "main", "index": 0 } ]] },
+    "Validate Required Fields": {
+      "main": [
+        [ { "node": "Register Connection (Postgres)", "type": "main", "index": 0 } ],
+        [ { "node": "Build Validation Error Response", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Register Connection (Postgres)": { "main": [[ { "node": "Build Success Response", "type": "main", "index": 0 } ]] },
+    "Build Success Response": { "main": [[ { "node": "Respond 200 OK", "type": "main", "index": 0 } ]] },
+    "Build Validation Error Response": { "main": [[ { "node": "Respond 400 Bad Request", "type": "main", "index": 0 } ]] }
+  },
+  "_gate4_note": "NAO importado na instancia real: a atualizacao ao vivo do workflow WF-01 - Intake - Rufino LinkedIn DEV (id 7qclFIAJGlRPODH8) esta bloqueada porque o MCP nao tem acesso habilitado nesse workflow especifico (mensagem da instancia: 'Workflow is not available in MCP. Enable MCP access from the workflow card in the workflows list, or from the workflow settings.'). Este JSON foi gerado e validado via validate_workflow (nodeCount=8, valid=true) mas precisa de importacao manual. Ver README-IMPORT.md e VALIDATION-REPORT.md."
+}
