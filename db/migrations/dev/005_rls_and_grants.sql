@@ -121,4 +121,25 @@ GRANT SELECT ON
     rufino_linkedin.notification_jobs
 TO n8n_rufino_linkedin_dev;
 
+-- -----------------------------------------------------------------------------
+-- Adendo pré-conexão: mesma disciplina — RLS habilitado (não forçado),
+-- SELECT-only para a role de aplicação, toda escrita via função.
+-- -----------------------------------------------------------------------------
+ALTER TABLE rufino_linkedin.schools          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rufino_linkedin.prospects        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rufino_linkedin.prospect_events  ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY schools_select_app ON rufino_linkedin.schools
+    FOR SELECT TO n8n_rufino_linkedin_dev USING (true);
+CREATE POLICY prospects_select_app ON rufino_linkedin.prospects
+    FOR SELECT TO n8n_rufino_linkedin_dev USING (true);
+CREATE POLICY prospect_events_select_app ON rufino_linkedin.prospect_events
+    FOR SELECT TO n8n_rufino_linkedin_dev USING (true);
+
+GRANT SELECT ON
+    rufino_linkedin.schools,
+    rufino_linkedin.prospects,
+    rufino_linkedin.prospect_events
+TO n8n_rufino_linkedin_dev;
+
 COMMIT;

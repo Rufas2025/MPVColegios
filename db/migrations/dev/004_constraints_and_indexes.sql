@@ -231,4 +231,63 @@ CREATE INDEX notification_jobs_claimable_idx
     WHERE status IN ('PENDING', 'CLAIMED');
 CREATE INDEX notification_jobs_connection_id_idx ON rufino_linkedin.notification_jobs (connection_id);
 
+-- -----------------------------------------------------------------------------
+-- schools (Adendo pré-conexão)
+--
+-- UNIQUE NULLS NOT DISTINCT é só o backstop contra duplicata EXATA sob
+-- concorrência (duas chamadas simultâneas com o mesmo nome+cidade+unidade,
+-- inclusive quando os três são NULL). A regra de negócio real — nunca casar
+-- por nome quando a cidade é desconhecida ou diferente — vive em
+-- register_prospect (006_functions.sql), não neste índice.
+-- -----------------------------------------------------------------------------
+CREATE UNIQUE INDEX schools_nome_cidade_unidade_key
+    ON rufino_linkedin.schools (nome_normalizado, cidade_normalizada, unidade)
+    NULLS NOT DISTINCT;
+
+-- -----------------------------------------------------------------------------
+-- prospects (Adendo pré-conexão)
+-- -----------------------------------------------------------------------------
+ALTER TABLE rufino_linkedin.prospects
+    ADD CONSTRAINT prospects_canonical_profile_url_key UNIQUE (canonical_profile_url),
+    ADD CONSTRAINT prospects_school_id_fkey FOREIGN KEY (school_id)
+        REFERENCES rufino_linkedin.schools (school_id) ON DELETE SET NULL,
+    ADD CONSTRAINT prospects_connection_id_fkey FOREIGN KEY (connection_id)
+        REFERENCES rufino_linkedin.connections (connection_id) ON DELETE SET NULL,
+    ADD CONSTRAINT prospects_status_check CHECK (status IN (
+        'IDENTIFICADO', 'QUALIFICADO', 'CONVITE_PENDENTE', 'CONECTADO', 'ENCERRADO'
+    )),
+    ADD CONSTRAINT prospects_icp_tier_check CHECK (icp_tier IS NULL OR icp_tier IN ('P1', 'P2', 'P3')),
+    ADD CONSTRAINT prospects_motivo_encerramento_check CHECK (
+        motivo_encerramento IS NULL OR motivo_encerramento IN (
+            'RECUSADO', 'SEM_RESPOSTA_PROSPECCAO', 'DUPLICADO', 'FORA_DO_ICP', 'OUTRO'
+        )
+    ),
+    ADD CONSTRAINT prospects_encerrado_tem_motivo_check CHECK (
+        status <> 'ENCERRADO' OR motivo_encerramento IS NOT NULL
+    );
+
+-- Vínculo idempotente 1:1 com connections — nenhuma connection pode ser
+-- reivindicada por dois prospects diferentes.
+CREATE UNIQUE INDEX prospects_connection_id_key
+    ON rufino_linkedin.prospects (connection_id) WHERE connection_id IS NOT NULL;
+
+-- Consulta central de get_daily_prospect_queue.
+CREATE INDEX prospects_status_tier_created_idx
+    ON rufino_linkedin.prospects (status, icp_tier, created_at) WHERE status = 'QUALIFICADO';
+CREATE INDEX prospects_school_id_idx ON rufino_linkedin.prospects (school_id);
+
+-- -----------------------------------------------------------------------------
+-- prospect_events (Adendo pré-conexão)
+-- -----------------------------------------------------------------------------
+ALTER TABLE rufino_linkedin.prospect_events
+    ADD CONSTRAINT prospect_events_prospect_id_fkey FOREIGN KEY (prospect_id)
+        REFERENCES rufino_linkedin.prospects (prospect_id) ON DELETE CASCADE,
+    ADD CONSTRAINT prospect_events_event_type_check CHECK (event_type IN (
+        'IDENTIFICADO', 'QUALIFICADO', 'CONVITE_ENVIADO', 'CONVITE_ACEITO',
+        'ENCERRADO', 'VINCULADO_CONNECTION'
+    ));
+
+CREATE INDEX prospect_events_prospect_id_created_at_idx
+    ON rufino_linkedin.prospect_events (prospect_id, created_at);
+
 COMMIT;

@@ -1,8 +1,16 @@
 -- =============================================================================
 -- 003_tables.sql
--- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0
+-- Rufino LinkedIn Intelligence — GATE 3 (banco DEV) — v1.5.0 + Adendo
+-- pré-conexão (ver ADDENDUM-prospecting-pre-connection-SPEC.md, commit
+-- df95326)
 --
 -- Aplicar com: psql -v ON_ERROR_STOP=1 -f 003_tables.sql
+--
+-- ADENDO (desenho aprovado, implementação nesta rodada): 3 tabelas novas —
+-- schools, prospects, prospect_events — cobrindo a etapa ANTERIOR ao
+-- aceite da conexão (IDENTIFICADO→QUALIFICADO→CONVITE_PENDENTE→CONECTADO→
+-- ENCERRADO). connections, as 11 tabelas pós-aceite e as 15 funções
+-- existentes não mudam nenhuma coluna/assinatura nesta rodada.
 --
 -- As 11 tabelas canônicas do modelo operacional, no schema privado
 -- rufino_linkedin. Apenas colunas, tipos, defaults, PK e NOT NULL — foreign
@@ -326,5 +334,98 @@ COMMENT ON COLUMN rufino_linkedin.notification_jobs.claim_token_hash IS
     'SHA-256 (hex) do token de posse do claim atual — rotacionado a cada (re)claim, nunca o valor bruto. confirm_notification_delivery localiza e trava a linha por este hash.';
 COMMENT ON COLUMN rufino_linkedin.notification_jobs.action_token_hash IS
     'Cópia do token_hash da linha de action_tokens gerada no claim mais recente deste job — nunca o valor bruto, só para rastreabilidade/auditoria (junta com action_tokens quando necessário).';
+
+-- -----------------------------------------------------------------------------
+-- schools — NOVA (Adendo pré-conexão)
+--
+-- Resolve "vincular sem duplicar" sem fundir escolas de cidades diferentes
+-- apenas pelo nome. cidade_normalizada NULL nunca é usada para encontrar
+-- uma linha existente (ver register_prospect em 006_functions.sql) — uma
+-- cidade desconhecida sempre cria uma linha nova, nunca reaproveita uma
+-- escola de cidade diferente (ou de cidade também desconhecida) por engano.
+-- -----------------------------------------------------------------------------
+CREATE TABLE rufino_linkedin.schools (
+    school_id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome                 text        NOT NULL,
+    nome_normalizado     text        NOT NULL,
+    cidade               text,
+    cidade_normalizada   text,
+    rede                 text,
+    unidade              text,
+    created_at           timestamptz NOT NULL DEFAULT now(),
+    updated_at           timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE rufino_linkedin.schools OWNER TO n8n_rufino_linkedin_owner_dev;
+
+COMMENT ON TABLE rufino_linkedin.schools IS
+    'Adendo pré-conexão — escola/rede à qual um prospect está vinculado. Dedupe por (nome_normalizado, cidade_normalizada, unidade); cidade desconhecida (NULL) nunca é fundida com nenhuma outra linha, nem entre si — ver register_prospect.';
+COMMENT ON COLUMN rufino_linkedin.schools.cidade_normalizada IS
+    'NULL quando a cidade não foi informada. register_prospect só reaproveita uma linha existente quando esta coluna é NOT NULL e bate exatamente — nunca casa por nome isolado.';
+
+-- -----------------------------------------------------------------------------
+-- prospects — NOVA (Adendo pré-conexão)
+--
+-- Pessoa identificada ANTES do aceite da conexão. Nunca é gravada em
+-- connections. canonical_profile_url é a chave real de dedupe (ver
+-- normalize_linkedin_url em 006_functions.sql) — linkedin_profile_url
+-- preserva o valor original como veio, sem normalizar, só para auditoria.
+-- connection_id é o vínculo idempotente com a jornada pós-aceite existente
+-- (register_prospect e link_prospect_to_connection resolvem esse vínculo
+-- nos dois sentidos, pela mesma URL canônica).
+-- -----------------------------------------------------------------------------
+CREATE TABLE rufino_linkedin.prospects (
+    prospect_id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    linkedin_profile_url     text        NOT NULL,
+    canonical_profile_url    text        NOT NULL,
+    nome                     text        NOT NULL,
+    primeiro_nome            text        NOT NULL,
+    cargo_atual              text,
+    cidade                   text,
+    vinculo_decisorio        text,
+    icp_tier                 text,
+    school_id                uuid,
+    status                   text        NOT NULL DEFAULT 'IDENTIFICADO',
+    origem                   text        NOT NULL,
+    convite_enviado_em       timestamptz,
+    convite_aceito_em        timestamptz,
+    motivo_encerramento      text,
+    connection_id            uuid,
+    lock_version             integer     NOT NULL DEFAULT 0,
+    created_at               timestamptz NOT NULL DEFAULT now(),
+    updated_at               timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE rufino_linkedin.prospects OWNER TO n8n_rufino_linkedin_owner_dev;
+
+COMMENT ON TABLE rufino_linkedin.prospects IS
+    'Adendo pré-conexão — funil IDENTIFICADO→QUALIFICADO→CONVITE_PENDENTE→CONECTADO→ENCERRADO, anterior ao aceite da conexão no LinkedIn. Nenhuma linha aqui implica que um convite foi de fato enviado automaticamente — mark_invite_sent só registra um fato que já aconteceu fora do sistema.';
+COMMENT ON COLUMN rufino_linkedin.prospects.canonical_profile_url IS
+    'URL normalizada (rufino_linkedin.normalize_linkedin_url) — chave real de dedupe e de vínculo com connections.profile_url. UNIQUE em 004_constraints_and_indexes.sql.';
+COMMENT ON COLUMN rufino_linkedin.prospects.connection_id IS
+    'Preenchido só depois que a mesma pessoa aparecer em connections (jornada pós-aceite já existente), por URL canônica — nunca por correspondência de nome. UNIQUE parcial em 004 garante 1:1.';
+
+-- -----------------------------------------------------------------------------
+-- prospect_events — NOVA (Adendo pré-conexão)
+--
+-- Histórico append-only do funil de prospecção, mesmo padrão de
+-- connection_status_history. Nunca grava token bruto ou segredo em
+-- `detalhe`.
+-- -----------------------------------------------------------------------------
+CREATE TABLE rufino_linkedin.prospect_events (
+    prospect_event_id   uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    prospect_id          uuid        NOT NULL,
+    event_type           text        NOT NULL,
+    detalhe              jsonb,
+    actor                text        NOT NULL,
+    source_workflow      text,
+    execution_id         text,
+    created_at           timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE rufino_linkedin.prospect_events OWNER TO n8n_rufino_linkedin_owner_dev;
+
+COMMENT ON TABLE rufino_linkedin.prospect_events IS
+    'Adendo pré-conexão — histórico append-only de eventos de um prospect (IDENTIFICADO/QUALIFICADO/CONVITE_ENVIADO/CONVITE_ACEITO/ENCERRADO/VINCULADO_CONNECTION). Espelha connection_status_history.';
 
 COMMIT;

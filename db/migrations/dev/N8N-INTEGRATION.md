@@ -389,8 +389,44 @@ Chamar qualquer uma das três diretamente com a credencial do n8n falha com `ins
 
 ---
 
+---
+
+## Adendo pré-conexão (ver ADDENDUM-prospecting-pre-connection-SPEC.md, commit df95326)
+
+Cobre a etapa **anterior** ao aceite da conexão: `IDENTIFICADO → QUALIFICADO → CONVITE_PENDENTE → CONECTADO → ENCERRADO`. Nenhuma das 15 funções acima mudou de assinatura, retorno ou comportamento nesta rodada.
+
+### `register_prospect`
+Cadastra/reaproveita um perfil identificado (dedupe por URL canônica — `p_linkedin_profile_url` normalizado via `normalize_linkedin_url`, interna). Resolve/cria a escola sem fundir por nome quando a cidade é desconhecida. Se já existir uma `connections` row com a mesma URL canônica, o prospect nasce direto em `CONECTADO` (vínculo idempotente automático). Parâmetros: `p_linkedin_profile_url, p_nome, p_primeiro_nome, p_cargo_atual, p_cidade, p_escola_nome, p_rede, p_unidade, p_origem, p_workflow_name, p_execution_id`. Retorna `prospect_id, status, school_id, connection_id, already_existed`.
+
+### `qualify_prospect`
+`IDENTIFICADO → QUALIFICADO`. Exige `p_icp_tier IN ('P1','P2','P3')`; rejeita se o prospect não estiver em `IDENTIFICADO`. Parâmetros: `p_prospect_id, p_icp_tier, p_vinculo_decisorio, p_justificativa, p_actor, p_workflow_name, p_execution_id`.
+
+### `get_daily_prospect_queue`
+Só leitura. Lista prospects `QUALIFICADO`, ordenados por `icp_tier, created_at`, **nunca mais de 20** mesmo que `p_limit` seja maior (teto aplicado dentro da função). Não transiciona nada. Parâmetros: `p_limit DEFAULT 20, p_workflow_name, p_execution_id`.
+
+### `mark_invite_sent`
+`QUALIFICADO → CONVITE_PENDENTE`. Registra um convite **já enviado manualmente** no LinkedIn — não envia nada. Idempotente: segunda chamada no mesmo prospect devolve `already_sent=true` sem reescrever o timestamp nem duplicar evento. Parâmetros: `p_prospect_id, p_actor, p_workflow_name, p_execution_id`.
+
+### `confirm_invite_accepted`
+`CONVITE_PENDENTE → CONECTADO`. **Ponto de entrada da cadência pós-aceite já existente** — depois desta chamada, a pessoa está pronta para o fluxo normal do GPT/WF-01 (register_connection), com `p_data_aceite` correspondendo ao que seria `data_conexao`. Idempotente. Parâmetros: `p_prospect_id, p_data_aceite, p_actor, p_workflow_name, p_execution_id`.
+
+### `close_prospect`
+Qualquer estado → `ENCERRADO`, com `p_motivo IN ('RECUSADO','SEM_RESPOSTA_PROSPECCAO','DUPLICADO','FORA_DO_ICP','OUTRO')`. Idempotente com o mesmo motivo; rejeita reescrever com motivo diferente. Parâmetros: `p_prospect_id, p_motivo, p_actor, p_workflow_name, p_execution_id`.
+
+### `link_prospect_to_connection`
+Reconciliação no sentido inverso de `register_prospect`: chamar depois que `register_connection` (WF-01, inalterado) gravar uma conexão nova, para vincular de volta ao prospect que a originou (mesma URL canônica). **Nenhum workflow chama isto automaticamente ainda** — é um node Postgres a acrescentar ao WF-01 quando autorizado, ou uma reconciliação manual/periódica enquanto isso não acontece. Idempotente; rejeita com erro claro se o prospect já estiver vinculado a uma `connection_id` diferente (nunca sobrescreve). Parâmetros: `p_connection_id, p_workflow_name, p_execution_id`. Retorna `prospect_id, linked, previous_status, new_status` (`linked=false` e os demais `NULL` quando a conexão não tem prospect correspondente — caso normal para conexões fora do funil de prospecção).
+
+### Internas do adendo (nunca chamadas pelo n8n)
+
+| Função | Por quê é interna |
+|---|---|
+| `normalize_linkedin_url` | Normalização pura da URL (lower, sem www/esquema/query/barra final) — usada pelas funções acima para comparar `prospects`/`connections` na mesma forma. |
+| `normalize_school_name` | Normalização pura de nome/cidade de escola (lower, espaços colapsados) para a resolução de `schools`. |
+
+---
+
 ## Contagem final (derivada do SQL, `006_functions.sql`)
 
-**15 funções totais** no schema `rufino_linkedin` — **12 executáveis pela role de aplicação** (as desta seção 1-8), **3 internas** (seção acima). **11 tabelas.** Nenhuma das 15 funções tem `EXECUTE` concedido a `PUBLIC`.
+**24 funções totais** no schema `rufino_linkedin` — **19 executáveis pela role de aplicação** (12 da jornada pós-aceite + 7 do adendo pré-conexão), **5 internas** (3 da jornada pós-aceite + 2 do adendo). **14 tabelas** (11 pós-aceite + 3 do adendo: `schools`, `prospects`, `prospect_events`). Nenhuma das 24 funções tem `EXECUTE` concedido a `PUBLIC`.
 
-Este é o contrato congelado do banco para o GATE 4 — qualquer mudança de assinatura, retorno ou comportamento aqui documentado exige uma nova revisão de GATE 3, não deve ser feita silenciosamente durante a construção dos workflows.
+Este é o contrato congelado do banco — qualquer mudança de assinatura, retorno ou comportamento aqui documentado exige nova revisão, não deve ser feita silenciosamente durante a construção dos workflows.

@@ -79,6 +79,19 @@ DROP FUNCTION IF EXISTS rufino_linkedin.confirm_notification_delivery(
     text, text, text, text, text
 );
 
+-- Adendo pré-conexão — 9 funções novas (7 de negócio + 2 internas).
+DROP FUNCTION IF EXISTS rufino_linkedin.link_prospect_to_connection(uuid, text, text);
+DROP FUNCTION IF EXISTS rufino_linkedin.close_prospect(uuid, text, text, text, text);
+DROP FUNCTION IF EXISTS rufino_linkedin.confirm_invite_accepted(uuid, timestamptz, text, text, text);
+DROP FUNCTION IF EXISTS rufino_linkedin.mark_invite_sent(uuid, text, text, text);
+DROP FUNCTION IF EXISTS rufino_linkedin.get_daily_prospect_queue(integer, text, text);
+DROP FUNCTION IF EXISTS rufino_linkedin.qualify_prospect(uuid, text, text, text, text, text, text);
+DROP FUNCTION IF EXISTS rufino_linkedin.register_prospect(
+    text, text, text, text, text, text, text, text, text, text, text
+);
+DROP FUNCTION IF EXISTS rufino_linkedin.normalize_school_name(text);
+DROP FUNCTION IF EXISTS rufino_linkedin.normalize_linkedin_url(text);
+
 -- -----------------------------------------------------------------------------
 -- 2) Grants e policies de RLS.
 --    (REVOKE de função já não é necessário depois do DROP FUNCTION acima —
@@ -98,6 +111,17 @@ REVOKE SELECT ON
     rufino_linkedin.callback_receipts,
     rufino_linkedin.notification_jobs
 FROM n8n_rufino_linkedin_dev;
+
+-- Adendo pré-conexão.
+REVOKE SELECT ON
+    rufino_linkedin.schools,
+    rufino_linkedin.prospects,
+    rufino_linkedin.prospect_events
+FROM n8n_rufino_linkedin_dev;
+
+DROP POLICY IF EXISTS schools_select_app ON rufino_linkedin.schools;
+DROP POLICY IF EXISTS prospects_select_app ON rufino_linkedin.prospects;
+DROP POLICY IF EXISTS prospect_events_select_app ON rufino_linkedin.prospect_events;
 
 DROP POLICY IF EXISTS connections_select_app ON rufino_linkedin.connections;
 DROP POLICY IF EXISTS analyses_select_app ON rufino_linkedin.analyses;
@@ -137,6 +161,13 @@ DROP TABLE IF EXISTS rufino_linkedin.delivery_events;
 DROP TABLE IF EXISTS rufino_linkedin.approvals;
 DROP TABLE IF EXISTS rufino_linkedin.message_versions;
 DROP TABLE IF EXISTS rufino_linkedin.analyses;
+
+-- Adendo pré-conexão — prospect_events e prospects referenciam connections
+-- via FK, então saem antes dela; schools não depende de connections, mas
+-- sai aqui também por simplicidade (prospects depende de schools).
+DROP TABLE IF EXISTS rufino_linkedin.prospect_events;
+DROP TABLE IF EXISTS rufino_linkedin.prospects;
+DROP TABLE IF EXISTS rufino_linkedin.schools;
 
 -- -----------------------------------------------------------------------------
 -- 4) Tabela connections — por último entre as tabelas (as demais referenciam
