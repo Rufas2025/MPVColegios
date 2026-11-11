@@ -1,6 +1,6 @@
 # CASO PILOTO 01 — Leandro (regra reutilizável "aceite → mensagem → D+1 → aprovação → acompanhamento")
 
-**Status:** desenhado e testado **localmente** (PostgreSQL descartável, réplica fiel do estado real do DEV). Data de conexão do Leandro **confirmada visualmente** (11/11/2026). **Nenhuma linha gravada no banco real `rufino-linkedin-dev`. Nenhuma mensagem real enviada. Nenhum workflow ativado. Migrações `011`/`012` ainda não aplicadas contra o DEV real — pendente de aprovação explícita de backup/preflight.**
+**Status (atualizado 2026-11-11): aplicado e testado de ponta a ponta no banco real `rufino-linkedin-dev`.** Migrações `011`, `012` e `013` aplicadas. Leandro registrado de verdade (`connection_id = 0d315743-ff4f-43f9-8da7-7404f7a2585f`), passou por `AGUARDANDO_D1 → AGUARDANDO_APROVACAO → APROVADO → PRONTO_PARA_ENVIO` via execução real de WF-02/WF-NOTIFY/WF-03. **Nenhuma mensagem real foi enviada no LinkedIn. Nenhum workflow foi ativado (todas as execuções foram manuais/sob demanda). PROD não foi tocado.** Ver `D1-EXCEPTIONAL-PILOT-TEST-RESULTS.md` para o relato completo do teste de hoje, incluindo o bloqueio exato (credencial Telegram) e o procedimento de confirmação manual do envio pendente.
 
 ## A regra reutilizável (não é código novo — é a composição do que já existe)
 

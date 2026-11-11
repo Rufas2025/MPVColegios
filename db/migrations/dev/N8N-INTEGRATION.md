@@ -436,8 +436,26 @@ Reconciliação no sentido inverso de `register_prospect`: chamar depois que `re
 
 ---
 
-## Contagem final (derivada do SQL, `006_functions.sql`)
+## Ferramenta de exceção manual (migração `013`, 2026-11-11)
 
-**24 funções totais** no schema `rufino_linkedin` — **19 executáveis pela role de aplicação** (12 da jornada pós-aceite + 7 do adendo pré-conexão), **5 internas** (3 da jornada pós-aceite + 2 do adendo). **14 tabelas** (11 pós-aceite + 3 do adendo: `schools`, `prospects`, `prospect_events`). Nenhuma das 24 funções tem `EXECUTE` concedido a `PUBLIC`.
+### `anticipate_connection_schedule`
+
+**Não é chamada por nenhum workflow automaticamente.** É uma ferramenta de exceção manual, invocada por um operador humano através de um node Postgres avulso, nunca dentro de WF-01/02/03/04/05 — nunca adicionar isto como step automático de nenhum workflow.
+
+**Finalidade:** antecipar o `scheduled_at` de **uma** conexão específica, sem alterar a regra global de D+1 (`operational_config`, que continua valendo para todos os demais contatos).
+
+**Parâmetros:** `p_connection_id, p_new_scheduled_at, p_motivo, p_actor, p_workflow_name DEFAULT 'EXCECAO-MANUAL', p_execution_id`. `p_motivo` e `p_actor` são obrigatórios (rejeita em branco).
+
+**Salvaguardas:** só aceita **antecipar** (`p_new_scheduled_at` precisa ser antes do `scheduled_at` atual — nunca adia); só opera sobre uma conexão em `AGUARDANDO_D1`; nunca faz `UPDATE` direto fora da função. O evento é registrado em `connection_status_history` (sem tabela nova) com `previous_status = new_status` (o status não muda, só o agendamento) e o motivo/ator/antes/depois no campo `reason`.
+
+**Retorno:** `connection_id, previous_scheduled_at, new_scheduled_at, status`.
+
+**Usada em 2026-11-11 exclusivamente para a connection_id do piloto Leandro** — ver `D1-EXCEPTIONAL-PILOT-TEST-RESULTS.md`.
+
+---
+
+## Contagem final (derivada do SQL, `006_functions.sql` + `013_anticipate_schedule_exceptional.sql`)
+
+**25 funções totais** no schema `rufino_linkedin` — **20 executáveis pela role de aplicação** (12 da jornada pós-aceite + 7 do adendo pré-conexão + 1 ferramenta de exceção manual), **5 internas** (3 da jornada pós-aceite + 2 do adendo). **15 tabelas** (11 pós-aceite + 3 do adendo: `schools`, `prospects`, `prospect_events` + `operational_config`). Nenhuma das 25 funções tem `EXECUTE` concedido a `PUBLIC`.
 
 Este é o contrato congelado do banco — qualquer mudança de assinatura, retorno ou comportamento aqui documentado exige nova revisão, não deve ser feita silenciosamente durante a construção dos workflows.
