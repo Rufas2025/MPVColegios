@@ -84,15 +84,33 @@ Todas as chamadas abaixo são reais, contra o banco `rufino-linkedin-dev`, usand
 >
 > Grande abraço, Rufino
 
-## 6. Como concluir o piloto (confirmação manual do envio)
+## 6. Envio confirmado e registrado (2026-11-11, 18:02 UTC / ~15h02 horário de Brasília)
 
-Quando você copiar e colar a mensagem acima para o Leandro no LinkedIn de verdade, me avise (ou chame diretamente) para registrar o envio com o `action_token` de entrega real já emitido (passo 8 da tabela acima) via `mark_message_sent(p_action='MARCAR_ENVIADA', p_first_followup_at=<data futura>)`. Isso: marca `connections.status = ENVIADO → FOLLOWUP_PENDENTE` e agenda o 1º follow-up real — nada disso é fabricado antes do envio real acontecer.
+Anderson confirmou por escrito, com print anexado como evidência, que enviou manualmente a mensagem acima ao Leandro no LinkedIn em 11/11/2026 às 15h (horário de Brasília). `mark_message_sent` foi chamado com o `action_token` de entrega real (passo 8 da tabela acima), `p_first_followup_at = now() + 3 dias` — mesma cadência já usada pelo node real "Compute First Followup Date" do WF-04 (`$now.plus(3, 'days')`), nunca inventada aqui.
 
-## 7. Regra permanente — inalterada
+**Nota de precisão:** `delivery_events.event_at`/`connection_status_history.created_at` registram o momento em que a confirmação foi processada no banco (18:02 UTC), não literalmente as 15h00:00 relatadas — a função não recebe um horário de envio como parâmetro, só confirma "agora". O horário exato relatado por você (15h, horário de Brasília) fica registrado no `actor`/`reason` do evento e neste documento, não como campo estruturado separado.
+
+**Readback final confirmado:**
+
+| Campo | Valor |
+|---|---|
+| `status` | `FOLLOWUP_PENDENTE` |
+| `data_conexao_origem` / `confirmado_por` | `linkedin_mynetwork_confirmacao_manual` / `anderson` (inalterado) |
+| Histórico de status | `NOVO → AGUARDANDO_D1 → (antecipação manual) → AGUARDANDO_APROVACAO → APROVADO → PRONTO_PARA_ENVIO → ENVIADO → FOLLOWUP_PENDENTE` — 8 eventos, todos com ator e motivo auditados |
+| `delivery_events` | `MENSAGEM_APRESENTADA` (17:51:11) + `MARCADO_COMO_ENVIADO` (18:02:47) |
+| `followups` | 1 linha, `sequence=1`, `scheduled_for = 2026-11-14 18:02:47 UTC` (D+3), não reivindicado ainda |
+
+**Verificação de entrega pendente duplicada:** os 2 `notification_jobs` (APPROVAL e DELIVERY) permanecem em `CLAIMED` — nunca chegaram a `DELIVERED`, porque nenhuma confirmação real de entrega no Telegram ocorreu (não registrei uma entrega que não aconteceu). Tecnicamente esses 2 jobs ficaram reivindicáveis de novo (`claim_expires_at` já passou), mas isso **não representa risco real de ação duplicada**: confirmei na definição real de `transition_connection_status` que ela rejeita com erro qualquer transição cujo status atual não bata com o esperado (`conflito de concorrência`) — como Leandro já está em `FOLLOWUP_PENDENTE`, um eventual reclaim futuro do WF-NOTIFY encontraria, na pior hipótese, uma notificação Telegram redundante e inofensiva (quando o Telegram existir), nunca uma segunda aprovação ou um segundo envio real. Nenhuma mensagem nova foi nem será enviada automaticamente.
+
+## 7. Acompanhamento de resposta (ponto 4 da sua autorização)
+
+Mecanismo existente, sem mudança: `claim_due_followups` (WF-05) reivindica este follow-up a partir de `2026-11-14 18:02:47 UTC`; a resposta é confirmada manualmente por você via `complete_followup` (`RESPONDEU` encerra a jornada; `SEM_RESPOSTA` com nova data reagenda, sem data encerra). **Nenhuma mensagem nova é enviada automaticamente** — WF-05 continua inativo, e mesmo ativo, só envia um lembrete pedindo sua confirmação manual, nunca uma mensagem ao Leandro.
+
+## 8. Regra permanente — inalterada
 
 `rufino_linkedin.operational_config` continua com `horario_d1 = 09:00:00`, `timezone = America/Sao_Paulo`, aplicável a todos os demais contatos. A exceção do item 1 afetou somente a conexão do Leandro.
 
-## 8. Lista exata do que seria necessário ativar (NÃO feito — aguardando sua decisão)
+## 9. Lista exata do que seria necessário ativar (NÃO feito — aguardando sua decisão)
 
 Nada abaixo foi ativado. Esta é a lista exata, para sua decisão explícita:
 
