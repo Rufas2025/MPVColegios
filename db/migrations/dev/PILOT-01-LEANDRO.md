@@ -1,6 +1,6 @@
 # CASO PILOTO 01 — Leandro (regra reutilizável "aceite → mensagem → D+1 → aprovação → acompanhamento")
 
-**Status:** desenhado e testado **localmente** (PostgreSQL descartável). **Nenhuma linha gravada no banco real `rufino-linkedin-dev`. Nenhuma mensagem real enviada. Nenhum workflow ativado.**
+**Status:** desenhado e testado **localmente** (PostgreSQL descartável, réplica fiel do estado real do DEV). Data de conexão do Leandro **confirmada visualmente** (11/11/2026). **Nenhuma linha gravada no banco real `rufino-linkedin-dev`. Nenhuma mensagem real enviada. Nenhum workflow ativado. Migrações `011`/`012` ainda não aplicadas contra o DEV real — pendente de aprovação explícita de backup/preflight.**
 
 ## A regra reutilizável (não é código novo — é a composição do que já existe)
 
@@ -11,7 +11,7 @@ register_prospect  → IDENTIFICADO            (rastreio/dedupe por URL canônic
     ↓
 qualify_prospect   → QUALIFICADO (Pn)         (classificação ICP; reaproveitado do adendo)
     ↓
-register_connection (WF-01, já existente, contrato congelado) → cria `connections`, calcula scheduled_at = D+1 09:00 America/Sao_Paulo
+register_connection (WF-01, já existente, contrato estendido em 012 — ver N8N-INTEGRATION.md) → cria `connections`, calcula scheduled_at = D+1 no horário operacional configurável (`operational_config`, padrão 09:00 America/Sao_Paulo), grava origem auditável da data (`data_conexao_origem`/`data_conexao_confirmado_por`)
     ↓
 link_prospect_to_connection → prospect vira CONECTADO, vinculado à connection real (reaproveitado do adendo)
     ↓
@@ -40,8 +40,11 @@ claim_due_followups + complete_followup (WF-05, já existente) → acompanhament
 | Histórico | Rede Elite de Ensino (anterior) → Colegium desde abril/2024 |
 | Estado da conexão | Aceita; mensagem ainda não enviada |
 | Classificação | P2, sujeita a validação |
+| **Data de conexão (confirmada visualmente em linkedin.com/mynetwork/invite-connect/connections/)** | **11/11/2026** |
+| **D+1 calculado** | **12/11/2026 09:00 America/Sao_Paulo** (horário operacional padrão; não é segunda/terça, sem ajuste de fim de semana) |
+| **Origem auditável gravada** | `data_conexao_origem = 'linkedin_mynetwork_confirmacao_manual'`, `data_conexao_confirmado_por = 'anderson'` |
 
-**Faltam, para o registro real:** a data exata do aceite da conexão (não informada — só "aceita", sem data). Sem ela, `register_connection` não pode ser chamada de verdade (o parâmetro `data_conexao` é obrigatório e usado para calcular o D+1). No teste local abaixo, uma data de teste claramente marcada foi usada só para validar a mecânica.
+A data do aceite agora é conhecida com certeza — confirmada visualmente por Anderson na própria página do LinkedIn (`mynetwork/invite-connect/connections/`), não pela data de importação nem pela data da confirmação manual em si. Como o LinkedIn exibe a data sem horário, o horário do aceite não foi inventado: o D+1 usa o horário operacional configurável (`rufino_linkedin.operational_config`, hoje 09:00 America/Sao_Paulo) só para preparar a mensagem, nunca como horário real do aceite.
 
 ## Mensagem de boas-vindas (D+1) — texto final proposto
 
@@ -69,9 +72,22 @@ Diferenças em relação ao texto de referência do usuário: removida a afirma�
 
 ## O que foi testado localmente (não contra o banco real)
 
-Ver `tests/pilot_01_leandro_tests.sql` — roda a sequência completa acima com os dados reais do Leandro (data de aceite marcada como `TESTE — data de aceite nao confirmada`), e cobre explicitamente:
+Dois arquivos de teste, deliberadamente separados para nunca misturar o dado real do Leandro com mecânica de teste:
+
+**`tests/pilot_01_leandro_tests.sql`** — roda os passos [1]-[7] com os dados **reais** do Leandro e a data de conexão **real confirmada** (`2026-11-11`). Cobre:
 - idempotência de `register_prospect` (registrar o mesmo LinkedIn do Leandro duas vezes não duplica);
-- cálculo de D+1 por `register_connection`;
+- `qualify_prospect` → QUALIFICADO/P2;
+- `register_connection` com os novos parâmetros de origem auditável (`linkedin_mynetwork_confirmacao_manual`/`anderson`) — calcula corretamente `scheduled_at = 2026-11-12 09:00 America/Sao_Paulo` (12:00 UTC);
+- `link_prospect_to_connection` → prospect vira CONECTADO;
+- `claim_due_connections` roda e **corretamente retorna 0 linhas**, porque hoje (11/11/2026) o D+1 (12/11/2026) ainda não chegou — isso é o comportamento certo, não uma falha;
+- leitura da trilha de auditoria gravada (`data_conexao_origem`, `data_conexao_confirmado_por`, `scheduled_at`, `status`).
+
+Este arquivo para intencionalmente aí: com a data real, o resto do pipeline (aprovação, envio, follow-up) só acontece de verdade a partir de 12/11/2026 09:00.
+
+**`tests/pilot_01_mechanics_tests.sql`** — roda a mecânica completa do pipeline pós-D+1 com um contato **sintético** (não o Leandro) e uma data de conexão de teste no passado (`CURRENT_DATE - 5 dias`), para exercitar de ponta a ponta sem esperar dias reais:
+- `claim_due_connections` reivindica a conexão sintética e cria o job de notificação;
 - aprovação humana (`approve_message`, decisão `APROVAR_E_PREPARAR`);
-- `mark_message_sent` e **prevenção de envio duplicado** (uma segunda tentativa de reivindicar/confirmar o mesmo job de notificação não duplica nem reenvia);
+- `mark_message_sent` e **prevenção de envio duplicado** (uma segunda tentativa de reivindicar/confirmar o mesmo job de notificação não duplica, e reuso do token de entrega é rejeitado com erro);
 - **interrupção após resposta**: `complete_followup` com `RESPONDEU` encerra a conexão (`ENCERRADO`) e nenhum follow-up novo é criado depois disso.
+
+Ambos os arquivos passaram limpos nesta rodada, contra uma réplica local fiel do estado real do banco DEV (base v1.5.1 + adendo de prospecção `011` + atualização da regra D+1 `012`).

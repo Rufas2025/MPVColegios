@@ -38,35 +38,46 @@ Todas as 12 funções abaixo são `SECURITY DEFINER`, chamadas via um único nod
 
 **Parâmetros obrigatórios:** `p_idempotency_key`, `p_nome`, `p_primeiro_nome`, `p_profile_url`, `p_data_conexao`, `p_mensagem` (nunca vazia). `p_idempotency_key` é responsabilidade do n8n: derive de forma estável do `connection_id` que o GPT já usa (nunca de texto livre mutável como `resumo`).
 
+**⚠️ Mudança de contrato (migração incremental `012`, "atualização da regra D+1") — 2 parâmetros novos, obrigatórios em tempo de execução:**
+- `p_data_conexao_origem` (`text`, `DEFAULT NULL` só por exigência de sintaxe — se vier `NULL` ou fora do enum, a função rejeita com `RAISE EXCEPTION`). Valores aceitos: `'linkedin_mynetwork_confirmacao_manual'` (data lida visualmente em `linkedin.com/mynetwork/invite-connect/connections/`) ou `'outro_confirmado_manualmente'`. **Nunca** um valor de origem automatizada/scraping — o enum exclui estruturalmente qualquer coisa que não seja confirmação manual auditável.
+- `p_data_conexao_confirmado_por` (`text`, mesma regra de obrigatoriedade em runtime) — identifica quem confirmou visualmente a data (ex.: `'anderson'`).
+- Ambos os valores são gravados em `connections.data_conexao_origem`/`connections.data_conexao_confirmado_por` (colunas novas, `NOT NULL`) como trilha de auditoria permanente.
+- `p_data_conexao` continua sendo **a data de conexão exibida pelo próprio LinkedIn** — nunca a data de importação nem a data em que alguém confirmou manualmente o fato. O D+1 é calculado a partir dela.
+- **Horário operacional configurável:** como o LinkedIn exibe a data sem horário, o horário usado para montar `scheduled_at` não é inventado a partir do aceite — vem de `rufino_linkedin.operational_config` (tabela singleton, hoje `horario_d1='09:00:00'`, `timezone='America/Sao_Paulo'`), lida internamente pela função (`SECURITY DEFINER`); o n8n não precisa (e não deve) passar horário algum.
+- Linhas antigas (se existirem) foram marcadas com `data_conexao_origem='legado_sem_origem_registrada'` / `data_conexao_confirmado_por='legado_sem_confirmacao_registrada'` — nunca um valor inventado como se fosse real.
+- Rollback dedicado em `rollback/003_d1_rule_update_rollback.sql`, que restaura a assinatura/corpo exatos de antes (20 parâmetros, horário fixo 09:00/America/Sao_Paulo) sem tocar em nenhum outro objeto.
+
 **Retorno:** `connection_id`, `status` (real, persistido — nunca um enum artificial), `scheduled_at`, `message_version_id`, `already_existed` (boolean).
 
 **Retry:** reenviar o mesmo payload com a mesma `idempotency_key` é seguro — devolve o registro existente (`already_existed=true`), nunca duplica.
 
-**Erros esperados:** parâmetro obrigatório ausente/vazio.
+**Erros esperados:** parâmetro obrigatório ausente/vazio; `p_data_conexao_origem` ausente ou fora do enum; `p_data_conexao_confirmado_por` ausente/vazio.
 
-**Exemplo de chamada (argumentos nomeados):**
+**Exemplo de chamada (argumentos nomeados, assinatura atual pós-`012`):**
 ```sql
 SELECT * FROM rufino_linkedin.register_connection(
-    p_idempotency_key  => $1,
-    p_nome             => $2,
-    p_primeiro_nome    => $3,
-    p_cargo            => $4,
-    p_instituicao      => $5,
-    p_cidade           => $6,
-    p_profile_url      => $7,
-    p_conversation_url => $8,
-    p_data_conexao     => $9,
-    p_resumo           => $10,
-    p_ganchos          => $11,
-    p_melhor_gancho    => $12,
-    p_justificativa    => $13,
-    p_confianca        => $14,
-    p_sensivel         => $15,
-    p_alertas          => $16,
-    p_brain_version    => $17,
-    p_mensagem         => $18,
-    p_workflow_name    => 'WF-01',
-    p_execution_id     => $19
+    p_idempotency_key              => $1,
+    p_nome                         => $2,
+    p_primeiro_nome                => $3,
+    p_cargo                        => $4,
+    p_instituicao                  => $5,
+    p_cidade                       => $6,
+    p_profile_url                  => $7,
+    p_conversation_url             => $8,
+    p_data_conexao                 => $9,
+    p_resumo                       => $10,
+    p_ganchos                      => $11,
+    p_melhor_gancho                => $12,
+    p_justificativa                => $13,
+    p_confianca                    => $14,
+    p_sensivel                     => $15,
+    p_alertas                      => $16,
+    p_brain_version                => $17,
+    p_mensagem                     => $18,
+    p_workflow_name                => 'WF-01',
+    p_execution_id                 => $19,
+    p_data_conexao_origem          => $20,
+    p_data_conexao_confirmado_por  => $21
 );
 ```
 
