@@ -131,9 +131,12 @@ for (var i = 0; i < eventos.length; i++) {
   var nome = limparNome(e.nome);
   var primeiro = (limparNome(e.primeiro_nome) || nome).split(' ')[0] || '';
   var slug = String(e.profile_slug || '').trim();
-  try { slug = decodeURIComponent(slug); } catch (err) {}
+  // Slug como vem no link: letras, digitos, - e _, ou bytes %XX (ex.: %e2%80%98).
+  // Nunca decodifica e recusa %XX que viraria / ? # (nada de URL arbitraria).
   slug = slug.toLowerCase();
-  var slugOk = /^[a-z0-9\\-_\\u00c0-\\u024f]{3,100}$/.test(slug);
+  var slugOk = slug.length <= 150
+    && /^(?:[a-z0-9\\-_\\u00c0-\\u024f]|%[0-9a-f]{2}){3,100}$/.test(slug)
+    && !/%(?:2f|3f|23|5c|25|3a|40|26|3d|2b|20|00)/.test(slug);
   var headline = limpar(e.headline).slice(0, 300);
   var data = /^\\d{4}-\\d{2}-\\d{2}$/.test(String(e.data_conexao || '')) ? String(e.data_conexao) : hoje;
   var base = {
