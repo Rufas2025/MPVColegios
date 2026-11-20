@@ -15,6 +15,9 @@ Header Auth `AvjmcjATuLDd2jvx` (Apps Script). Chat Telegram autorizado: `5550833
 | 20/11 | Banco | Migração 014 aplicada (origem `linkedin_email_notificacao_aceite`). |
 | 20/11 | Banco | Migração 015 aplicada (claim de follow-up 7 dias). md5 de claim_due_followups no DEV = `233dab2a9c192afcc9c6581de3a19820`, igual ao teste local; app executa, PUBLIC não. |
 | 20/11 | WF-05 `W36Y8pew9wwaCb6d` | Publicado (versão `9ea9444c`), autorizado por Anderson. Detalhes abaixo. Workflow temporário de preview `NqOUs9ddhl32xcpB` arquivado. |
+| 20/11 | WF-02 `CxLUUmLpj3mA0nfz` | Teto de 20 aprovações por dia (`p_limit` 50 → 20), versão `faa158e7`. Autorizado por Anderson. |
+| 20/11 | Banco | Lote do export de conexões (Connections.csv de 19/11): 36 ICP + Ari de Sá Neto aprovados. Onda 1 (12) cadastrada em 20/11; ondas 2 (20) e 3 (5) prontas nos workflows inativos `cyeA1JATMy5oEVXM` e `CPL1RObZ6u9MUklc`, para rodar seg 23/11 e ter 24/11 após 9h. Origem `outro_confirmado_manualmente`, workflow `LOTE-EXPORT-2026-11`. Os arquivos do export não foram versionados (dados pessoais). |
+| 20/11 | Banco | Narda Helena Jorosky cadastrada manualmente (REVISAR → ICP, autorizado). |
 
 ## Detalhes
 
