@@ -21,6 +21,9 @@
 
 BEGIN;
 
+-- Credencial DDL do n8n nao tem privilegio proprio: assume a owner so nesta transacao.
+SET LOCAL ROLE n8n_rufino_linkedin_owner_dev;
+
 CREATE OR REPLACE FUNCTION rufino_linkedin.claim_due_followups(
     p_limit          integer,
     p_workflow_name  text DEFAULT 'WF-05',

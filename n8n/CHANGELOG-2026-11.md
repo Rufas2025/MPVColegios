@@ -13,10 +13,12 @@ Header Auth `AvjmcjATuLDd2jvx` (Apps Script). Chat Telegram autorizado: `5550833
 | 19/11 | WF-02 `CxLUUmLpj3mA0nfz` | Agenda dias úteis 9h (America/Sao_Paulo) e pula feriados da tabela de dados `Feriados - Rufino LinkedIn` (`68dMfcuKOk9OqDXb`). |
 | 20/11 | WF-01E `KMD9YouA1Un7Y68H` (novo) | Recebe do Apps Script `Linkedin \| Leads` os e-mails de aceite, classifica ICP, monta a mensagem D+1 e chama register_connection (origem `linkedin_email_notificacao_aceite`). Webhook com Header Auth `X-Leads-Token`. `PROCESSAMENTO_REAL = true` desde 20/11 (autorizado). Registro roda antes da resposta ao script. Código: `apps-script/linkedin-leads/`. |
 | 20/11 | Banco | Migração 014 aplicada (origem `linkedin_email_notificacao_aceite`). |
+| 20/11 | Banco | Migração 015 aplicada (claim de follow-up 7 dias). md5 de claim_due_followups no DEV = `233dab2a9c192afcc9c6581de3a19820`, igual ao teste local; app executa, PUBLIC não. |
+| 20/11 | WF-05 `W36Y8pew9wwaCb6d` | Publicado (versão `9ea9444c`), autorizado por Anderson. Detalhes abaixo. Workflow temporário de preview `NqOUs9ddhl32xcpB` arquivado. |
 
-## Preparadas, aguardando autorização para publicar
+## Detalhes
 
-### WF-05 Follow-up `W36Y8pew9wwaCb6d` (inativo; rascunho alterado em 20/11)
+### WF-05 Follow-up `W36Y8pew9wwaCb6d` (publicado em 20/11)
 
 Backup da versão anterior: `n8n/backups/2026-11-20/`.
 
@@ -32,9 +34,9 @@ Correção:
 - Novo nó "Buscar Contato" (uma consulta para todos os follow-ups) e "Montar Lembrete": nome, cargo · instituição, pergunta "X respondeu?", botão "Abrir perfil de X", botões "Respondeu" / "Sem resposta" (`f:R:`/`f:N:` + token, 52 bytes, limite do Telegram 64).
 - Migração `db/migrations/dev/015_followup_claim_ttl.sql`: validade do botão de 1 hora para 7 dias. Rollback: `rollback/007_followup_claim_ttl_rollback.sql`. Testes: `tests/followup_claim_ttl_tests.sql`.
 
-Ordem de publicação (quando autorizado):
-1. Aplicar 015 no DEV (credencial DDL) e conferir md5 de claim_due_followups = `233dab2a9c192afcc9c6581de3a19820`.
+Ordem de publicação executada:
+1. Aplicar 015 no DEV (credencial DDL, que precisa de `SET LOCAL ROLE n8n_rufino_linkedin_owner_dev` dentro da transação; a primeira tentativa sem isso falhou com "permission denied for schema" e não alterou nada) e conferir md5 de claim_due_followups = `233dab2a9c192afcc9c6581de3a19820`.
 2. Publicar o WF-05.
 3. Arquivar o workflow temporário `99 - TEMP Preview Lembrete Follow-up` (`NqOUs9ddhl32xcpB`).
 
-Efeito imediato esperado: na primeira execução (dia útil, 9h) sai o lembrete do follow-up vencido do Leandro (agendado para 14/11) e, se já vencido, o do "TESTE SINTETICO WF-ROUTER" (22/11).
+Efeito esperado: na primeira execução (dia útil, 9h) sai o lembrete do follow-up vencido do Leandro (agendado para 14/11) e, se já vencido, o do "TESTE SINTETICO WF-ROUTER" (22/11).
