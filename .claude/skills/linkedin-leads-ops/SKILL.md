@@ -97,7 +97,7 @@ com a credencial do app.
 | Aceite não virou contato | Apps Script → Execuções; log de `processarAceites` | `MODO` diferente de `PRODUCAO`; acionador removido; e-mail não chegou (LinkedIn suprime se você já viu no app; limite de envio). |
 | Script loga "HTTP 403" | Credencial Header Auth no n8n | Token no n8n diferente de `N8N_WEBHOOK_TOKEN`; credencial criada em outra instância (já aconteceu: crm nar). |
 | Script loga "HTTP 404" | WF-01E | Workflow despublicado ou caminho mudou. |
-| Contato "REVISAR"/"NAO LIDO" no Telegram | Cargo do e-mail | Cargo ausente ou fora do padrão; decida e cadastre manualmente se for ICP. |
+| Contato "REVISAR"/"NAO LIDO" no Telegram | Cargo do e-mail | Cargo ausente ou fora do padrão. Se o Anderson confirmar ICP, cadastrar com `register_connection` pelo `99 - TEMP Manual SQL` (mesmos parâmetros do WF-01E, `p_workflow_name => 'MANUAL-REVISAR'`; precedente: Narda, 20/11). |
 | Aprovação não chegou às 9h | Execuções do WF-02 e WF-NOTIFY | Feriado na tabela; WF-02 inativo; job preso em CLAIMED (expira em 15 min e é reenviado). |
 | Botão não faz nada | Execuções do WF-ROUTER | Outro workflow com Telegram Trigger foi ativado e roubou o webhook; republique o WF-ROUTER e desative o outro. |
 | ⚠️ "Não foi possível concluir" | — | Botão já usado, vencido (7 dias) ou de mensagem antiga. Não é erro do sistema. |
@@ -152,8 +152,8 @@ Antes das 9h:
 - [ ] n8n: WF-01E, WF-02, WF-05, WF-NOTIFY e WF-ROUTER ativos.
 
 9h às 9h15:
-- [ ] WF-02 executou com sucesso e reivindicou 7 contatos.
-- [ ] Chegaram 7 aprovações no Telegram (Nagib, Regiane, Rodrigo, Walid, Kerena, Maycon, Sylvio), com a saudação certa.
+- [ ] WF-02 executou com sucesso e reivindicou 8 contatos.
+- [ ] Chegaram 8 aprovações no Telegram (Nagib, Regiane, Rodrigo, Walid, Kerena, Maycon, Sylvio, Narda), com a saudação certa.
 - [ ] WF-05 executou e chegaram 2 lembretes: Leandro (real) e TESTE SINTETICO.
 - [ ] Nenhuma mensagem duplicada.
 

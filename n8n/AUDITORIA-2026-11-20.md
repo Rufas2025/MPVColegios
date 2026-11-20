@@ -28,7 +28,7 @@ Classificação: **VALIDADO** = evidência direta · **PENDENTE** = depende de e
 | 4 | Deduplicação | VALIDADO | Nenhuma URL nem nome duplicado em `connections`. Índice único em `idempotency_key`; WF-01E checa URL existente; Apps Script rotula o e-mail processado. |
 | 4 | Autenticação do webhook | VALIDADO | Sem cabeçalho → 403; token errado → 403; GET → 404; URL de teste → 404 (testado agora). Header Auth `X-Leads-Token`. |
 | 4 | Travas | VALIDADO | `PROCESSAMENTO_REAL = true` (liberado por Anderson em 20/11). `MODO = PRODUCAO` comprovado pelo log "8 aceite(s) enviado(s), 8 conversa(s) rotulada(s)". Registro roda antes da resposta ao script. |
-| 4 | Acionador de 10 min do Apps Script | PENDENTE | Instalado (log 11:57). Não há acesso a esta conta Google daqui. Desde 14:59 o WF-01E não recebeu nada, o que é coerente com "sem aceite novo" mas não prova que o acionador roda. Conferir em Apps Script → Execuções. |
+| 4 | Acionador de 10 min do Apps Script | VALIDADO (atualizado 12h31) | Aceite real da Narda Helena Jorosky chegou sozinho: WF-01E execução 1076 às 12h31, classificado REVISAR (cita ensino superior), aviso enviado ao Telegram, e-mail rotulado. Anderson confirmou ICP e o cadastro manual foi feito (execução 1082, `AGUARDANDO_D1`, 23/11 9h, workflow `MANUAL-REVISAR`). |
 | 5 | Botões de aprovação/entrega (a:A, a:S, a:B) | VALIDADO | Fluxo real Fanny/Rudney/Bruno em 19/11; cópia limpa + botões confirmados por Anderson. |
 | 5 | Botões de follow-up (f:R, f:N) | PENDENTE | Caminho de erro validado com toque real (token falso → aviso ⚠️, nada gravado). Caminho de sucesso só em teste local + simulado; primeiro uso real: lembrete do Leandro em 23/11. |
 | 6 | Dias úteis e feriados | VALIDADO (config) / PENDENTE (execução) | WF-02 e WF-05: seg–sex 9h, tabela `Feriados - Rufino LinkedIn`. Teste com a tabela real hoje (20/11, feriado): fluxo parou antes de reivindicar. 23/11 não é feriado. |
@@ -45,11 +45,10 @@ Nenhum bloqueio para a operação de 23/11. Pontos que exigem ação humana:
 1. **Fanny:** o texto gravado começa com "Fala, Fanny!"; pela regra (mulher → "Olá") corrija ao colar. Marcar como enviada até 26/11.
 2. **Rudney e Bruno:** aprovar ou descartar até 26/11.
 3. **Contato sintético:** tocar "Respondeu" no lembrete de 23/11.
-4. **Apps Script:** abrir Execuções e confirmar que `processarAceites` roda a cada 10 min sem erro.
 5. **Exports:** baixar do n8n (menu ⋯ → Download) WF-ROUTER, WF-NOTIFY, WF-02 e WF-05 para `n8n/workflows/` para fechar a rastreabilidade.
 
 ## Não é 100%
 
 A operação real de 23/11 9h ainda não aconteceu. Até lá ficam PENDENTES: primeira execução do WF-02 com
 a cadência por e-mail, primeiro lembrete real do WF-05, primeiro toque real em "Respondeu"/"Sem resposta",
-e a confirmação do acionador do Apps Script.
+(o acionador do Apps Script já foi comprovado pelo aceite da Narda).
