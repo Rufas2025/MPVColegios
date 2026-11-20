@@ -85,6 +85,17 @@ function testarLeitura() {
 }
 
 /* =====================================================================
+ * 3b) Teste do token: envia um pacote VAZIO ao n8n (nenhum contato).
+ *     HTTP 200 = token aceito. HTTP 403 = token recusado.
+ * ===================================================================== */
+function testarConexao() {
+  var resposta = enviarAoN8n_([], 'teste');
+  if (!resposta) return;
+  Logger.log('Token aceito pelo n8n. processamento_real = %s | status = %s',
+    resposta.processamento_real, (resposta.resultados || []).map(function (r) { return r.status; }).join(','));
+}
+
+/* =====================================================================
  * 4) Teste controlado: envia ao n8n em modo teste (nada é gravado,
  *    nada é rotulado). Exige MODO = TESTE. Rode manualmente.
  * ===================================================================== */
