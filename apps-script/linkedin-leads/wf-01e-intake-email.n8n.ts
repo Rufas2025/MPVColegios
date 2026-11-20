@@ -23,9 +23,9 @@ const preparar = node({
     name: 'Preparar Eventos',
     parameters: {
       mode: 'runOnceForAllItems',
-      jsCode: `// Trava do servidor: enquanto for false, NADA e gravado no banco,
-// mesmo que o script peca modo producao.
-const PROCESSAMENTO_REAL = false;
+      jsCode: `// Trava do servidor: liberada em 20/11/2026 por Anderson ("pode liberar").
+// Para travar de novo, volte para false e publique.
+const PROCESSAMENTO_REAL = true;
 
 const req = $input.first().json || {};
 const body = req.body || {};
