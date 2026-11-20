@@ -79,9 +79,25 @@ function testarLeitura() {
   var lote = coletarAceites_(false);
   Logger.log('%s aceite(s) lido(s) (incluindo já rotulados). Nada foi enviado.', lote.eventos.length);
   lote.eventos.forEach(function (e, i) {
-    Logger.log('#%s %s | primeiro nome: %s | cargo: %s | perfil: linkedin.com/in/%s | data: %s',
-      i + 1, e.nome, e.primeiro_nome, e.headline || '(não encontrado)', e.profile_slug || '(não encontrado)', e.data_conexao);
+    Logger.log('#%s %s | primeiro nome: %s | cargo: %s (fonte: %s) | perfil: linkedin.com/in/%s | data_conexao: %s | recebido: %s',
+      i + 1, e.nome, e.primeiro_nome, e.headline || '(ausente no e-mail)', e._fonte_cargo || '-',
+      e.profile_slug || '(não encontrado)', e.data_conexao, e._recebido);
   });
+  // Diagnóstico: se algum cargo ficou ausente, mostra o corpo do 1º desses e-mails
+  // sem nenhum link (os links do LinkedIn carregam tokens de login).
+  var semCargo = lote.eventos.filter(function (e) { return !e.headline; })[0];
+  if (semCargo) {
+    Logger.log('--- DIAGNÓSTICO (%s): corpo em texto, links removidos ---', semCargo.nome);
+    linhasSemLinks_(semCargo._texto).slice(0, 30).forEach(function (l, i) { Logger.log('T%s: %s', i + 1, l); });
+    Logger.log('--- DIAGNÓSTICO (%s): corpo HTML convertido em texto, links removidos ---', semCargo.nome);
+    linhasSemLinks_(semCargo._htmlTexto).slice(0, 30).forEach(function (l, i) { Logger.log('H%s: %s', i + 1, l); });
+  }
+}
+
+function linhasSemLinks_(texto) {
+  return String(texto || '').split(/\r?\n/)
+    .map(function (l) { return l.replace(/(https?:\/\/|www\.)\S+/gi, '[link]').replace(/\S*token\S*/gi, '[removido]').replace(/\s+/g, ' ').trim(); })
+    .filter(function (l) { return l && l !== '[link]'; });
 }
 
 /* =====================================================================
@@ -217,14 +233,49 @@ function extrairEvento_(msg, assunto, meuSlug) {
 
   var texto = msg.getPlainBody() || '';
   var html = msg.getBody() || '';
+  var htmlTexto = htmlParaTexto_(html);
+  var cargo = headlineDoCorpo_(texto, nome, primeiro);
+  var fonte = cargo ? 'texto' : '';
+  if (!cargo) { cargo = headlineDoCorpo_(htmlTexto, nome, primeiro); fonte = cargo ? 'html' : ''; }
   return {
     gmail_message_id: msg.getId(),
     nome: nome,
     primeiro_nome: primeiro,
-    headline: headlineDoCorpo_(texto, nome),
+    headline: cargo,               // vazio quando o e-mail não traz cargo: nunca inventado
     profile_slug: slugDoPerfil_(html + '\n' + texto, meuSlug),
-    data_conexao: Utilities.formatDate(msg.getDate(), CONFIG.FUSO, 'yyyy-MM-dd')
+    // data_conexao = dia (Brasília) em que a notificação chegou na caixa
+    data_conexao: Utilities.formatDate(msg.getDate(), CONFIG.FUSO, 'yyyy-MM-dd'),
+    // campos com _ são só para o log local; enviarAoN8n_ remove antes de enviar
+    _recebido: Utilities.formatDate(msg.getDate(), CONFIG.FUSO, 'dd/MM/yyyy HH:mm'),
+    _fonte_cargo: fonte,
+    _texto: texto,
+    _htmlTexto: htmlTexto
   };
+}
+
+var ENTIDADES_ = {
+  aacute: 'á', Aacute: 'Á', agrave: 'à', Agrave: 'À', acirc: 'â', Acirc: 'Â', atilde: 'ã', Atilde: 'Ã',
+  eacute: 'é', Eacute: 'É', ecirc: 'ê', Ecirc: 'Ê', iacute: 'í', Iacute: 'Í',
+  oacute: 'ó', Oacute: 'Ó', ocirc: 'ô', Ocirc: 'Ô', otilde: 'õ', Otilde: 'Õ',
+  uacute: 'ú', Uacute: 'Ú', uuml: 'ü', Uuml: 'Ü', ccedil: 'ç', Ccedil: 'Ç',
+  ntilde: 'ñ', Ntilde: 'Ñ', middot: '·', bull: '•', ndash: '-', mdash: '-',
+  lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', hellip: '...'
+};
+
+// Converte o HTML do e-mail em linhas de texto (uma por bloco visual).
+function htmlParaTexto_(html) {
+  var s = String(html || '');
+  s = s.replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, ' ');
+  s = s.replace(/<br\s*\/?>/gi, '\n');
+  s = s.replace(/<\/(p|div|td|tr|li|h[1-6]|table|a|span)>/gi, '\n');
+  s = s.replace(/<[^>]+>/g, ' ');
+  s = s.replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"')
+       .replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+       .replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(parseInt(n, 10)); })
+       .replace(/&#x([0-9a-f]+);/gi, function (m, n) { return String.fromCharCode(parseInt(n, 16)); })
+       .replace(/&([a-z]+);/gi, function (m, n) { return ENTIDADES_[n] || m; });
+  return s.split(/\n/).map(function (l) { return l.replace(/\s+/g, ' ').trim(); })
+    .filter(function (l) { return l; }).join('\n');
 }
 
 // "Sylvio Oliveira via LinkedIn" <invitations@linkedin.com>  ->  Sylvio Oliveira
@@ -235,17 +286,26 @@ function nomeDoRemetente_(from) {
   return s;
 }
 
-// No corpo em texto, o cargo vem na linha logo abaixo do nome.
-function headlineDoCorpo_(texto, nome) {
-  var linhas = String(texto).split(/\r?\n/).map(function (l) { return l.replace(/\s+/g, ' ').trim(); });
-  var alvo = normalizar_(nome);
-  if (!alvo) return '';
+// O cargo (headline) é a primeira linha útil logo abaixo da linha com o nome.
+// Se o e-mail não tiver essa linha, devolve '' (cargo ausente).
+var LINHA_NAO_CARGO = /https?:\/\/|www\.|linkedin\.com|\[link\]|^enviar mensagem|^ver perfil|^send message|^view profile|^mensagem$|^message$|aceitou seu convite|accepted your invitation|conhe[cç]a a rede|^ver todos|^ver conex|cancelar inscri|unsubscribe|^\W*$/i;
+function headlineDoCorpo_(texto, nome, primeiro) {
+  var linhas = String(texto || '').split(/\r?\n/).map(function (l) { return l.replace(/\s+/g, ' ').trim(); });
+  var alvos = [normalizar_(nome)];
+  var alvoPrimeiro = normalizar_(primeiro);
+  if (alvoPrimeiro && alvoPrimeiro.indexOf(' ') > 0) alvos.push(alvoPrimeiro);
+  alvos = alvos.filter(function (a) { return a && a.length >= 3; });
+  if (alvos.length === 0) return '';
   for (var i = 0; i < linhas.length; i++) {
-    if (normalizar_(linhas[i]) !== alvo) continue;
+    var n = normalizar_(linhas[i]);
+    if (alvos.indexOf(n) < 0) continue;
     for (var j = i + 1; j < Math.min(linhas.length, i + 4); j++) {
       var l = linhas[j];
       if (!l) continue;
-      if (/https?:\/\/|linkedin\.com|^enviar mensagem|^ver perfil|^send message|^view profile|aceitou seu convite|accepted your invitation/i.test(l)) break;
+      var nl = normalizar_(l);
+      if (alvos.indexOf(nl) >= 0) continue;          // nome repetido
+      if (LINHA_NAO_CARGO.test(l)) break;            // botão, link ou rodapé: sem cargo
+      if (l.length < 3) break;
       return l.slice(0, 300);
     }
   }
@@ -259,9 +319,9 @@ function slugDoPerfil_(conteudo, meuSlug) {
   var ordem = [];
   var m;
   while ((m = re.exec(conteudo)) !== null) {
-    var s = m[1];
-    try { s = decodeURIComponent(s); } catch (e) {}
-    s = s.toLowerCase();
+    // Mantém o slug como está no link (ex.: %e2%80%98 continua codificado),
+    // para a URL do perfil continuar válida.
+    var s = m[1].toLowerCase();
     if (meuSlug && s === meuSlug) continue;
     if (!cont[s]) { cont[s] = 0; ordem.push(s); }
     cont[s]++;
@@ -284,6 +344,12 @@ function enviarAoN8n_(eventos, modoEnvio) {
     Logger.log('Faltam N8N_WEBHOOK_URL ou N8N_WEBHOOK_TOKEN nas propriedades do script.');
     return null;
   }
+  // Envia só os campos públicos (remove _texto, _htmlTexto etc. do log local).
+  eventos = eventos.map(function (e) {
+    var limpo = {};
+    Object.keys(e).forEach(function (k) { if (k.charAt(0) !== '_') limpo[k] = e[k]; });
+    return limpo;
+  });
   var headers = {};
   headers[CONFIG.HEADER_TOKEN] = token;
   var resp = UrlFetchApp.fetch(url, {
