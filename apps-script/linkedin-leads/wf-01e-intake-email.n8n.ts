@@ -355,15 +355,22 @@ const registrar = node({
   }
 });
 
+// ORDEM DOS RAMOS (importante): o n8n (executionOrder v1) executa os ramos
+// que saem de "Decidir" de cima para baixo no canvas. "Responder ao Script"
+// precisa ficar POR ÚLTIMO (mais abaixo), depois de "Registrar Conexao":
+// se o registro falhar, o Apps Script não recebe 200, não rotula o e-mail
+// e tenta de novo em 10 minutos. Publicado (versão 1556abae) com:
+//   Montar Resumo Telegram y=96 | Somente Registrar y=352 | Responder ao Script y=608.
+// Ao reimportar este código, confira as posições antes de publicar.
 export default workflow('wf-01e', 'WF-01E - Intake por E-mail (Apps Script) - Rufino LinkedIn DEV')
   .add(webhook)
   .to(preparar)
   .to(buscarExistentes)
   .to(decidir)
-  .to(responder)
-  .add(decidir)
   .to(resumo)
   .to(telegramResumo)
   .add(decidir)
   .to(filtro)
-  .to(registrar);
+  .to(registrar)
+  .add(decidir)
+  .to(responder);
