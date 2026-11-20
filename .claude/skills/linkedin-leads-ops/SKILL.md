@@ -154,7 +154,7 @@ Antes das 9h:
 9h às 9h15:
 - [ ] WF-02 executou com sucesso e reivindicou 20 contatos (teto diário).
 - [ ] Chegaram 20 aprovações no Telegram: os 8 aceites recentes (Nagib, Regiane, Rodrigo, Walid, Kerena, Maycon, Sylvio, Narda), o Ari de Sá Neto e os 11 mais antigos do lote do export (onda 1).
-- [ ] Às 10h: onda 2 do lote cadastrada (workflow `99 - TEMP Lote Export Onda 2`, 20 contatos para terça). Terça 10h: onda 3 (5 contatos para quarta). Lembretes agendados nesta sessão.
+- [ ] Às 10h: onda 2 do lote cadastrada (workflow `99 - TEMP Lote Export Onda 2`, 20 contatos para terça). Terça 10h: onda 3 (6 contatos para quarta). Lembretes agendados nesta sessão.
 - [ ] WF-05 executou e chegaram 2 lembretes: Leandro (real) e TESTE SINTETICO.
 - [ ] Nenhuma mensagem duplicada.
 

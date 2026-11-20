@@ -56,14 +56,18 @@ function genero(primeiro) {
 
 var FORTE_FORA = /(ajudamos|consultori|fornecedor|edtech|plataforma|software|startup|vendas|comercial|marketing|representante|recrutador|recursos humanos|secretaria|prefeitura|municipal|estadual|governo|rede publica|seduc|semed|ministerio)/;
 var FRACO_FORA = /(universidade|faculdade|centro universitario|ensino superior|anhanguera|estacio|kroton|cogna|curso livre|idiomas|curso de ingles)/;
-var DECISOR = /(diretor|diretora|director|principal|head of school|mantenedor|mantenedora|proprietari|socio|socia|fundador|fundadora|\\bceo\\b|presidente)/;
+var DECISOR = /(diretor|diretora|director|\\bdirecao\\b|principal|head of school|mantenedor|mantenedora|proprietari|\\bsoci[oa]\\b|fundador|fundadora|\\bceo\\b|presidente)/;
+// 21/11/2026: "Direção Geral" (substantivo) é decisor; "sócio/sócia" só como palavra inteira ("Associação" não conta).
+var APOIO_DIRECAO = /(assistente|auxiliar|secretari[ao]|apoio) (de |da )?direcao/;
+// Coordenação geral pode ser quem decide em algumas escolas: vai para revisão do Anderson, não para fora.
+var COORD_GERAL = /(coordenador|coordenadora|coordenacao) geral/;
 var ESCOLA_CTX = /(colegio|\\bescola\\b|escolar|school|educacional|educacao|ensino|pedagogic|maple bear|bilingue|infantil|instituto|educandario|liceu)/;
 var NAO_DECISOR = /(coordenador|coordenadora|coordenacao|orientador|orientadora|orientacao|professor|professora|analista|assistente|supervisor|supervisora)/;
 
 function classificar(headline) {
   var h = semAcento(headline);
   if (!h) return { c: 'REVISAR', motivo: 'e-mail sem cargo' };
-  var decisor = DECISOR.test(h);
+  var decisor = DECISOR.test(h) && !(APOIO_DIRECAO.test(h) && !/(diretor|diretora|mantenedor|ceo|fundador|socio|socia)/.test(h));
   var escola = ESCOLA_CTX.test(h);
   if (FORTE_FORA.test(h)) return { c: 'FORA_ICP', motivo: 'fornecedor, governo/rede publica ou area comercial' };
   if (decisor && escola) {
@@ -72,6 +76,7 @@ function classificar(headline) {
   }
   if (FRACO_FORA.test(h)) return { c: 'FORA_ICP', motivo: 'ensino superior ou idiomas' };
   if (decisor) return { c: 'REVISAR', motivo: 'decisor sem escola clara no cargo' };
+  if (COORD_GERAL.test(h) && escola) return { c: 'REVISAR', motivo: 'coordenacao geral: pode ser quem decide na escola' };
   if (NAO_DECISOR.test(h)) return { c: 'FORA_ICP', motivo: 'cargo sem decisao (coordenacao, orientacao ou docencia)' };
   return { c: 'REVISAR', motivo: 'cargo nao reconhecido' };
 }
