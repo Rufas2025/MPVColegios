@@ -52,3 +52,32 @@ Atenção (⚠️):
   do Apps Script para o n8n.
 - Falha só em execução de teste/manual não dispara o Error Trigger (regra do n8n).
 - Se o próprio WF-90 falhar, não há quem avise: por isso o relatório das 8h40 sai sempre.
+
+## Quando o Claude perde o acesso ao n8n (incidente de 21/11/2026)
+
+O fluxo de produção (Apps Script → webhook → n8n → Postgres → Telegram) **não passa pelo conector do Claude**.
+O conector serve só para o Claude consultar e alterar workflows. Se ele cair, a cadência continua rodando, e o
+relatório das 8h40 segue sendo a fonte de verdade.
+
+Diagnóstico em 21/11, a partir de ~13h (Brasília):
+- Os dois conectores n8n da conta caíram ao mesmo tempo com o mesmo erro da ponte de conectores do Claude
+  (502/503). Um deles é a instância Rufino DEV e o outro é a instância crm nar, que é outro servidor.
+- Ao mesmo tempo, a instância Rufino DEV respondia normal: `/healthz` 200, endpoint MCP 401 sem token em 0,6 s,
+  webhook de aceites 403 sem token. Houve um único POST lento (~14h), que não se repetiu.
+- Conclusão: a falha está na ponte entre a sessão do Claude e os conectores, não no n8n nem no fluxo.
+
+Checagem rápida (sem credencial; só mostra se o n8n está de pé):
+```
+H=https://rufino-linkedin-dev-n8n.snfrzv.easypanel.host
+curl -s -o /dev/null -w '%{http_code}\n' $H/healthz          # 200
+curl -s -o /dev/null -w '%{http_code}\n' $H/mcp-server/http  # 401 (endpoint do MCP vivo, pede token)
+```
+
+O que fazer:
+1. Reconectar o conector em claude.ai → Configurações → Conectores e abrir uma sessão nova (conectores são lidos
+   quando a sessão começa).
+2. Caminho reserva, opcional: uma chave da API do n8n (Settings → n8n API) salva como segredo do ambiente do
+   Claude (nunca no chat nem no repositório). Com ela, o Claude lê e publica workflows pela API REST sem depender
+   da ponte de conectores.
+3. Mudança de produção marcada para antes das 9h que não pôde ser aplicada: avisar o Anderson antes das 9h de
+   que vale a configuração antiga naquele dia.
