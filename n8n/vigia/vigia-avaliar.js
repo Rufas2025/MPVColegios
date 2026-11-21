@@ -17,13 +17,11 @@ const manha = (() => { try { return $('Modo Manhã').isExecuted; } catch (e) { r
 const fatos = $('Fatos do Banco').first().json.fatos || {};
 const agora = new Date(fatos.agora || Date.now());
 
-// Feriados: aceita qualquer campo da linha que tenha uma data AAAA-MM-DD.
+// Feriados: só a coluna "data" da tabela (createdAt/updatedAt também são datas e não podem entrar).
 const feriados = new Set();
 for (const it of $('Ler Feriados').all()) {
-  for (const v of Object.values(it.json || {})) {
-    const m = String(v == null ? '' : v).match(/^(\d{4}-\d{2}-\d{2})/);
-    if (m) feriados.add(m[1]);
-  }
+  const m = String((it.json || {}).data == null ? '' : it.json.data).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) feriados.add(m[1]);
 }
 
 function dataSP(d) { return new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 10); }

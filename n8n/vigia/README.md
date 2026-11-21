@@ -35,6 +35,16 @@ Atenção (⚠️):
 - `vigia-avaliar.js`: decide o que é falha ou atenção (conhece os feriados). Testada com 10 cenários simulados.
 - `wf-90-vigia.n8n.ts`: workflow, **gerado** por `node n8n/vigia/montar.js`. Editar só os dois arquivos acima.
 
+## Estado (21/11/2026)
+
+Criado **desativado** no n8n: `WF-90 - Vigia (relatório e alertas) - Rufino LinkedIn DEV` (`hIDAtmpRUxOIEVGM`), projeto
+`Ml3QRAVaQdfd1Bj6`, fuso America/Sao_Paulo, credenciais Postgres app `DgnSAHo0I8CRFwci` (só leitura) e Telegram
+`COKModG0SV9z7mMi`. Testado com Telegram simulado (nada enviado):
+- execução 2064, manhã com dados reais do banco e a tabela real de feriados: relatório certo (o teste anterior, 2059,
+  pegou o erro de ler `createdAt` como feriado, já corrigido);
+- execução 2060, tarde sem falha: não envia;
+- execução 2061, falha simulada no WF-02: alerta com workflow, nó, erro e link da execução.
+
 ## Implantação (cada item precisa de autorização)
 
 1. Validar o código no n8n (`validate_workflow`), conferindo os parâmetros do nó de tabela de dados com `get_node_types`.

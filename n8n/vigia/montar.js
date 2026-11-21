@@ -30,12 +30,12 @@ const ts = `// GERADO por n8n/vigia/montar.js a partir de vigia-fatos.sql e vigi
 import { workflow, node, trigger, newCredential, expr } from '@n8n/workflow-sdk';
 
 const manha = trigger({
-  type: 'n8n-nodes-base.scheduleTrigger', version: 1.2,
-  config: { name: 'Manhã 8h40', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '40 8 * * 1-5' }] } } }
+  type: 'n8n-nodes-base.scheduleTrigger', version: 1.3,
+  config: { name: 'Manhã 8h40', parameters: { rule: { interval: [{ field: 'weeks', weeksInterval: 1, triggerAtDay: [1, 2, 3, 4, 5], triggerAtHour: 8, triggerAtMinute: 40 }] } } }
 });
 const tarde = trigger({
-  type: 'n8n-nodes-base.scheduleTrigger', version: 1.2,
-  config: { name: 'Tarde 15h', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '0 15 * * 1-5' }] } } }
+  type: 'n8n-nodes-base.scheduleTrigger', version: 1.3,
+  config: { name: 'Tarde 15h', parameters: { rule: { interval: [{ field: 'weeks', weeksInterval: 1, triggerAtDay: [1, 2, 3, 4, 5], triggerAtHour: 15, triggerAtMinute: 0 }] } } }
 });
 const modoManha = node({
   type: 'n8n-nodes-base.noOp', version: 1, config: { name: 'Modo Manhã' }
@@ -44,10 +44,11 @@ const modoTarde = node({
   type: 'n8n-nodes-base.noOp', version: 1, config: { name: 'Modo Tarde' }
 });
 const feriados = node({
-  type: 'n8n-nodes-base.dataTable', version: 1,
+  type: 'n8n-nodes-base.dataTable', version: 1.1,
   config: {
     name: 'Ler Feriados',
-    parameters: { resource: 'row', operation: 'get', dataTableId: { __rl: true, mode: 'id', value: '68dMfcuKOk9OqDXb' }, returnAll: true },
+    parameters: { resource: 'row', operation: 'get', dataTableId: { __rl: true, mode: 'id', value: '68dMfcuKOk9OqDXb', cachedResultName: 'Feriados - Rufino LinkedIn' }, returnAll: true },
+    // Tabela vazia não pode calar o relatório das 8h40: segue com um item vazio (o Avaliar ignora).
     alwaysOutputData: true, executeOnce: true
   }
 });
@@ -65,10 +66,10 @@ const avaliar = node({
   config: { name: 'Avaliar', parameters: { mode: 'runOnceForAllItems', jsCode: ${lit(avaliar)} } }
 });
 const deveEnviar = node({
-  type: 'n8n-nodes-base.filter', version: 2.2,
+  type: 'n8n-nodes-base.filter', version: 2.3,
   config: {
     name: 'Deve Enviar',
-    parameters: { conditions: { options: { caseSensitive: true, typeValidation: 'loose' }, combinator: 'and',
+    parameters: { conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' }, combinator: 'and',
       conditions: [{ leftValue: expr('{{ $json.enviar }}'), rightValue: true, operator: { type: 'boolean', operation: 'true', singleValue: true } }] } }
   }
 });
