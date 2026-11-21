@@ -5,8 +5,12 @@
 // Horário de Brasília fixo em -03:00 (sem horário de verão desde 2019). Se voltar, ajustar OFFSET.
 
 const OFFSET = '-03:00';
-const TETO_DIA = 20;                 // p_limit do WF-02
-const DIAS_RECENTE = 5;              // aceite "recente": data_conexao nos últimos 5 dias
+// Regra (Anderson, 21/11/2026): o que manda é o D+1. 20/dia é só referência; se passar de 20 com frequência,
+// sobe a referência para 30. Acima da referência a fila sai inteira no D+1, sem segurar ninguém.
+const REFERENCIA = 20;               // referência de volume diário
+const REFERENCIA_ALTA = 30;          // próxima régua, se a de 20 estourar com frequência
+const LIMITE_SEGURANCA = 100;        // p_limit do WF-02: trava contra enxurrada por erro, não é meta
+const DIAS_FREQUENTE = 3;            // estouros em 10 dias úteis para sugerir rever a régua
 const DIAS_UTEIS_SEM_ACEITE = 5;     // depois disso, suspeitar do acionador do Apps Script
 
 const manha = (() => { try { return $('Modo Manhã').isExecuted; } catch (e) { return false; } })();
@@ -50,16 +54,26 @@ const alertas = [];   // algo quebrou ou vai se perder
 const atencao = [];   // exige ação sua, mas o sistema está funcionando
 const info = [];
 
-// 1. Fila de aprovação D+1 e teto de 20.
+// 1. Fila de aprovação D+1.
 const fila = fatos.fila || [];
 const devidos = fila.filter(f => new Date(f.scheduled_at) <= proxExec);
-const ficam = devidos.slice(TETO_DIA);
-const recentes = ficam.filter(f => f.data_conexao >= somaDias(hoje, -DIAS_RECENTE));
-info.push('Aprovações ' + fmt(proxExec) + ': <b>' + Math.min(devidos.length, TETO_DIA) + '</b>' +
-  (ficam.length ? ' (fila de ' + devidos.length + '; ' + ficam.length + ' ficam para o dia útil seguinte)' : ''));
-if (recentes.length) {
-  atencao.push(recentes.length + ' aceite(s) recente(s) vão passar de D+1 por causa do teto de 20: ' + nomes(recentes) +
-    '. Se quiser, segure uma onda do export para abrir vaga.');
+const ficam = devidos.slice(LIMITE_SEGURANCA);
+info.push('Aprovações ' + fmt(proxExec) + ': <b>' + Math.min(devidos.length, LIMITE_SEGURANCA) + '</b>' +
+  (devidos.length > REFERENCIA ? ' (acima da referência de ' + REFERENCIA + '; sai tudo no D+1)' : ''));
+if (ficam.length) {
+  alertas.push(devidos.length + ' aprovações para ' + fmt(proxExec) + ', acima da trava de segurança de ' + LIMITE_SEGURANCA +
+    ' do WF-02: ' + ficam.length + ' ficariam fora do D+1. Conferir se não é cadastro duplicado antes de subir a trava.');
+}
+// Frequência: quantos dos últimos 10 dias úteis passaram da referência (só aceites recentes, sem as ondas do export).
+const ultimos = (fatos.aprovacoes_por_dia || []).filter(d => diaUtil(String(d.dia).slice(0, 10))).slice(-10);
+const acima20 = ultimos.filter(d => d.recentes > REFERENCIA).length;
+const acima30 = ultimos.filter(d => d.recentes > REFERENCIA_ALTA).length;
+if (acima30 >= DIAS_FREQUENTE) {
+  atencao.push('Aceites novos passaram de ' + REFERENCIA_ALTA + '/dia em ' + acima30 + ' dos últimos ' + ultimos.length +
+    ' dias úteis. Hora de rever a régua de novo.');
+} else if (acima20 >= DIAS_FREQUENTE) {
+  atencao.push('Aceites novos passaram de ' + REFERENCIA + '/dia em ' + acima20 + ' dos últimos ' + ultimos.length +
+    ' dias úteis. Sugestão: subir a referência para ' + REFERENCIA_ALTA + '.');
 }
 
 // 2. WF-02 rodou na última janela?

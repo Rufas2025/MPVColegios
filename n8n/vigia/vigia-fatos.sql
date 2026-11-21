@@ -31,7 +31,19 @@ SELECT json_build_object(
                 'scheduled_at', f.scheduled_at, 'created_at', f.created_at) ORDER BY f.pos) FROM fila f), '[]'::json),
     'ultima_reivindicacao_d1', (SELECT max(h.created_at)
                                   FROM rufino_linkedin.connection_status_history h
-                                 WHERE h.new_status = 'AGUARDANDO_APROVACAO'),
+                                 WHERE h.new_status = 'AGUARDANDO_APROVACAO'
+                                   AND h.previous_status = 'AGUARDANDO_D1'),
+    -- Aprovações liberadas pelo WF-02 por dia (Brasília) nos últimos 20 dias; "recentes" = aceites de até 4 dias,
+    -- que é o volume que a referência de 20/dia mede (as ondas do export ficam de fora).
+    'aprovacoes_por_dia', COALESCE((SELECT json_agg(json_build_object('dia', x.dia, 'total', x.total, 'recentes', x.recentes) ORDER BY x.dia)
+                              FROM (SELECT (h.created_at AT TIME ZONE 'America/Sao_Paulo')::date AS dia,
+                                           count(*) AS total,
+                                           count(*) FILTER (WHERE c.data_conexao >= (h.created_at AT TIME ZONE 'America/Sao_Paulo')::date - 4) AS recentes
+                                      FROM rufino_linkedin.connection_status_history h
+                                      JOIN rufino_linkedin.connections c ON c.connection_id = h.connection_id
+                                     WHERE h.new_status = 'AGUARDANDO_APROVACAO' AND h.previous_status = 'AGUARDANDO_D1'
+                                       AND h.created_at >= now() - interval '20 days'
+                                     GROUP BY 1) x), '[]'::json),
     'ultimo_claim_followup', (SELECT max(f.claimed_at) FROM rufino_linkedin.followups f),
     'botoes', COALESCE((SELECT json_agg(json_build_object(
                 'nome', b.nome, 'primeiro', b.primeiro_nome, 'status', b.status,

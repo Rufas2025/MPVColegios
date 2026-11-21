@@ -51,7 +51,7 @@ Instância n8n: `rufino-linkedin-dev-n8n.snfrzv.easypanel.host`, projeto `Ml3QRA
 | Workflow | ID | Gatilho | Responsabilidade |
 |---|---|---|---|
 | WF-01E Intake por E-mail | `KMD9YouA1Un7Y68H` | Webhook POST `rufino-linkedin-aceites` (Header Auth) | Valida, classifica ICP, dedup por URL, monta mensagem, `register_connection`. Trava `PROCESSAMENTO_REAL` no 1º Code node. |
-| WF-02 Scheduler D+1 | `CxLUUmLpj3mA0nfz` | Seg–sex 9h (America/Sao_Paulo) | Pula feriado; `claim_due_connections(p_limit => 20)`: no máximo 20 aprovações por dia, mais antigas primeiro. |
+| WF-02 Scheduler D+1 | `CxLUUmLpj3mA0nfz` | Seg–sex 9h (America/Sao_Paulo) | Pula feriado; reivindica os vencidos, mais antigos primeiro. **Regra (Anderson, 21/11): o D+1 manda.** 20/dia é referência, não teto; se os aceites novos passarem de 20 com frequência, a referência sobe para 30. `p_limit` passa de 20 para 100 (trava contra enxurrada por erro); enquanto a mudança não for publicada, o valor no n8n continua 20. |
 | WF-NOTIFY Outbox | `xmshrOsfUkWSBfnG` | A cada minuto + "Disparo Imediato" | `claim_notification_jobs` → envia aprovação/entrega → `confirm_notification_delivery`. |
 | WF-ROUTER | `Gjc9slZAO5lcS5RM` | **Único** Telegram Trigger (callback_query) | Valida remetente (chat 5550833898) e roteia `a:*` e `f:*`. |
 | WF-05 Follow-up | `W36Y8pew9wwaCb6d` | Seg–sex 9h | Pula feriado; `claim_due_followups` → lembrete com nome e botões. Sem trigger de Telegram. |
@@ -152,8 +152,8 @@ Antes das 9h:
 - [ ] n8n: WF-01E, WF-02, WF-05, WF-NOTIFY e WF-ROUTER ativos.
 
 9h às 9h15:
-- [ ] WF-02 executou com sucesso e reivindicou 20 contatos (teto diário).
-- [ ] Chegaram 20 aprovações no Telegram: os 8 aceites recentes (Nagib, Regiane, Rodrigo, Walid, Kerena, Maycon, Sylvio, Narda), o Ari de Sá Neto e os 11 mais antigos do lote do export (onda 1).
+- [ ] WF-02 executou com sucesso e reivindicou todos os vencidos (20 + aceites novos do fim de semana, se o `p_limit` 100 já estiver publicado; senão, 20).
+- [ ] Chegaram as aprovações no Telegram, incluindo: os 8 aceites recentes (Nagib, Regiane, Rodrigo, Walid, Kerena, Maycon, Sylvio, Narda), o Ari de Sá Neto e os 11 mais antigos do lote do export (onda 1).
 - [ ] Às 10h: onda 2 do lote cadastrada (workflow `99 - TEMP Lote Export Onda 2`, 20 contatos para terça). Terça 10h: onda 3 (6 contatos para quarta). Lembretes agendados nesta sessão.
 - [ ] WF-05 executou e chegaram 2 lembretes: Leandro (real) e TESTE SINTETICO.
 - [ ] Nenhuma mensagem duplicada.

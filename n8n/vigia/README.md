@@ -11,7 +11,11 @@ fluxo no Telegram. **O objetivo é que nenhuma falha passe em silêncio**, e nã
 | Dias úteis 15h | Mesmas checagens | Só se houver falha |
 | Na hora | Error Trigger: qualquer execução de produção com erro no WF-01E, WF-02, WF-05, WF-NOTIFY ou WF-ROUTER | Sempre |
 
+Regra de volume (Anderson, 21/11/2026): **o D+1 manda**. 20/dia é referência, não teto: se a fila do dia tiver 32 ou 42,
+sai tudo no D+1. O `p_limit` do WF-02 fica em 100 só como trava contra enxurrada por erro.
+
 Falhas detectadas (🚨):
+- fila do dia acima da trava de 100 (alguém sairia do D+1; conferir duplicação antes de subir);
 - WF-02 não reivindicou ninguém na última janela das 9h, havendo contatos vencidos que já existiam;
 - WF-05 não enviou lembretes vencidos;
 - botão de aprovação/entrega vencido (não há reenvio automático);
@@ -20,7 +24,7 @@ Falhas detectadas (🚨):
 - `workflow_errors` aberto ou contato em status `ERRO`.
 
 Atenção (⚠️):
-- aceite recente que vai passar de D+1 por causa do teto de 20;
+- aceites novos acima de 20/dia em 3 dos últimos 10 dias úteis (sugere subir a referência para 30) ou acima de 30 (rever a régua);
 - botões de aprovação, entrega ou follow-up que vencem em menos de 48h;
 - nenhum aceite novo há 5 dias úteis (possível acionador do Apps Script parado);
 - tabela de feriados acabando em menos de 60 dias.
@@ -28,7 +32,7 @@ Atenção (⚠️):
 ## Arquivos
 
 - `vigia-fatos.sql`: consulta somente leitura (credencial do app). Testada no Postgres local com o papel `n8n_rufino_linkedin_dev`.
-- `vigia-avaliar.js`: decide o que é falha ou atenção (conhece os feriados). Testada com 6 cenários simulados.
+- `vigia-avaliar.js`: decide o que é falha ou atenção (conhece os feriados). Testada com 10 cenários simulados.
 - `wf-90-vigia.n8n.ts`: workflow, **gerado** por `node n8n/vigia/montar.js`. Editar só os dois arquivos acima.
 
 ## Implantação (cada item precisa de autorização)
