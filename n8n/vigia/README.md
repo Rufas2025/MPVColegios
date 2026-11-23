@@ -7,8 +7,9 @@ fluxo no Telegram. **O objetivo é que nenhuma falha passe em silêncio**, e nã
 
 | Quando | O quê | Envia |
 |---|---|---|
-| Dias úteis 8h40 (antes do WF-02/WF-05) | Relatório: aprovações e lembretes das 9h, botões esperando toque, falhas e pontos de atenção | Sempre. Se não chegar às 8h40, o próprio silêncio é o alarme (n8n, Postgres ou Telegram fora). |
+| Dias úteis 8h40 (antes do WF-02/WF-05) | Bom dia: aprovações e follow-ups das 9h, "ontem" (enviados, descartados, respostas), semana e taxa de resposta, falhas e pontos de atenção | Sempre. Se não chegar às 8h40, o próprio silêncio é o alarme (n8n, Postgres ou Telegram fora). |
 | Dias úteis 15h | Mesmas checagens | Só se houver falha |
+| Dias úteis 18h | Fechamento do dia: enviados, descartados, respostas, o que espera seu toque e o que sai amanhã às 9h | Sempre |
 | Na hora | Error Trigger: qualquer execução de produção com erro no WF-01E, WF-02, WF-05, WF-NOTIFY ou WF-ROUTER | Sempre |
 
 Regra de volume (Anderson, 21/11/2026): **o D+1 manda**. 20/dia é referência, não teto: se a fila do dia tiver 32 ou 42,

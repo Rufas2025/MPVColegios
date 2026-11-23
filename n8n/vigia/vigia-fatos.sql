@@ -44,6 +44,17 @@ SELECT json_build_object(
                                      WHERE h.new_status = 'AGUARDANDO_APROVACAO' AND h.previous_status = 'AGUARDANDO_D1'
                                        AND h.created_at >= now() - interval '20 days'
                                      GROUP BY 1) x), '[]'::json),
+    -- Painel: envios, descartes e respostas por dia (Brasília), últimos 14 dias.
+    'movimentos_por_dia', COALESCE((SELECT json_agg(json_build_object('dia', m.dia, 'enviados', m.enviados,
+                                    'descartados', m.descartados, 'respondidos', m.respondidos) ORDER BY m.dia)
+                              FROM (SELECT (h.created_at AT TIME ZONE 'America/Sao_Paulo')::date AS dia,
+                                           count(*) FILTER (WHERE h.new_status = 'ENVIADO') AS enviados,
+                                           count(*) FILTER (WHERE h.new_status = 'DESCARTADO') AS descartados,
+                                           count(*) FILTER (WHERE h.new_status = 'RESPONDEU') AS respondidos
+                                      FROM rufino_linkedin.connection_status_history h
+                                     WHERE h.new_status IN ('ENVIADO', 'DESCARTADO', 'RESPONDEU')
+                                       AND h.created_at >= now() - interval '14 days'
+                                     GROUP BY 1) m), '[]'::json),
     'ultimo_claim_followup', (SELECT max(f.claimed_at) FROM rufino_linkedin.followups f),
     'botoes', COALESCE((SELECT json_agg(json_build_object(
                 'nome', b.nome, 'primeiro', b.primeiro_nome, 'status', b.status,

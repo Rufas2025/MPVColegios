@@ -24,6 +24,7 @@ Header Auth `AvjmcjATuLDd2jvx` (Apps Script). Chat Telegram autorizado: `5550833
 | 21/11 | WF-90 `hIDAtmpRUxOIEVGM` (novo, **inativo**) | Vigia: relatório 8h40 (sempre), checagem 15h (só com falha) e alerta imediato de erro dos workflows da cadência. Somente leitura no banco; sem Telegram Trigger. Testado com Telegram simulado (execuções 2060, 2061, 2064). Ativação prevista depois da execução real das 9h de seg 23/11, com autorização. Ver `n8n/vigia/README.md`. |
 | 23/11 | WF-NOTIFY `xmshrOsfUkWSBfnG` (rascunho, **não publicado**) | Mensagem de entrega dentro de bloco `<pre>`: um toque no Telegram copia o texto inteiro, sem selecionar. Pedido do Anderson para valer a partir de 24/11. Testado com pin data (execução 4844, escape de `< > &` ok). Publicado = `0da7e069`; backup do nó alterado em `n8n/backups/2026-11-23/`. |
 | 23/11 | Lote | WF-02 das 9h liberou 39 aprovações (primeira execução sem teto de 20). Onda 2 cadastrada às 10h01 (execução 4894): 20 contatos `AGUARDANDO_D1`, nenhum já existente; saem ter 24/11 9h. |
+| 23/11 | WF-90 `hIDAtmpRUxOIEVGM` (inativo) | Painel diário aprovado por Anderson: 18h fechamento (enviados, descartados, respostas, pendências, amanhã) e 8h40 com ontem, semana e taxa de resposta. Fonte: histórico de status. Testado (execução 4905). |
 
 ## Detalhes
 

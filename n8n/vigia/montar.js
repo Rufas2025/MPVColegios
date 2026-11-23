@@ -24,6 +24,7 @@ const ts = `// GERADO por n8n/vigia/montar.js a partir de vigia-fatos.sql e vigi
 // WF-90 Vigia - Rufino LinkedIn DEV
 //  - 8h40 dias úteis: relatório sempre (se não chegar, o próprio silêncio é o alarme).
 //  - 15h dias úteis: só envia se houver falha.
+//  - 18h dias úteis: fechamento do dia (enviados, descartados, respostas, pendências, amanhã).
 //  - Error Trigger: alerta na hora quando WF-01E/02/05/NOTIFY/ROUTER falham (settings.errorWorkflow deles = este).
 // Somente leitura no banco. Nenhum Telegram Trigger (o único continua sendo o WF-ROUTER).
 // Fuso do workflow: America/Sao_Paulo.
@@ -36,6 +37,13 @@ const manha = trigger({
 const tarde = trigger({
   type: 'n8n-nodes-base.scheduleTrigger', version: 1.3,
   config: { name: 'Tarde 15h', parameters: { rule: { interval: [{ field: 'weeks', weeksInterval: 1, triggerAtDay: [1, 2, 3, 4, 5], triggerAtHour: 15, triggerAtMinute: 0 }] } } }
+});
+const noite = trigger({
+  type: 'n8n-nodes-base.scheduleTrigger', version: 1.3,
+  config: { name: 'Noite 18h', parameters: { rule: { interval: [{ field: 'weeks', weeksInterval: 1, triggerAtDay: [1, 2, 3, 4, 5], triggerAtHour: 18, triggerAtMinute: 0 }] } } }
+});
+const modoNoite = node({
+  type: 'n8n-nodes-base.noOp', version: 1, config: { name: 'Modo Noite' }
 });
 const modoManha = node({
   type: 'n8n-nodes-base.noOp', version: 1, config: { name: 'Modo Manhã' }
@@ -97,6 +105,7 @@ const telegram = node({
 export default workflow('wf-90', 'WF-90 - Vigia (relatório e alertas) - Rufino LinkedIn DEV')
   .add(manha).to(modoManha).to(feriados).to(fatos).to(avaliar).to(deveEnviar).to(telegram)
   .add(tarde).to(modoTarde).to(feriados)
+  .add(noite).to(modoNoite).to(feriados)
   .add(erro).to(montarErro).to(telegram);
 `;
 fs.writeFileSync(path.join(dir, 'wf-90-vigia.n8n.ts'), ts);

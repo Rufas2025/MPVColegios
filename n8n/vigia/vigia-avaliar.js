@@ -1,6 +1,7 @@
 // WF-90 Vigia, nó "Avaliar" (Code, runOnceForAllItems).
 // Entrada: "Fatos do Banco" (vigia-fatos.sql) e "Ler Feriados" (tabela de dados Feriados - Rufino LinkedIn).
 // Saída: { enviar, texto }. Manhã (8h40): sempre envia (se não chegar, isso já é o alarme).
+// Noite (18h): sempre envia o fechamento do dia (painel aprovado por Anderson em 23/11/2026).
 // Tarde (15h): só envia se houver alerta.
 // Horário de Brasília fixo em -03:00 (sem horário de verão desde 2019). Se voltar, ajustar OFFSET.
 
@@ -13,7 +14,9 @@ const LIMITE_SEGURANCA = 100;        // p_limit do WF-02: trava contra enxurrada
 const DIAS_FREQUENTE = 3;            // estouros em 10 dias úteis para sugerir rever a régua
 const DIAS_UTEIS_SEM_ACEITE = 5;     // depois disso, suspeitar do acionador do Apps Script
 
-const manha = (() => { try { return $('Modo Manhã').isExecuted; } catch (e) { return false; } })();
+const executou = n => { try { return $(n).isExecuted; } catch (e) { return false; } };
+const manha = executou('Modo Manhã');
+const noite = executou('Modo Noite');
 const fatos = $('Fatos do Banco').first().json.fatos || {};
 const agora = new Date(fatos.agora || Date.now());
 
@@ -144,12 +147,51 @@ if (!futuros.length || futuros[futuros.length - 1] < somaDias(hoje, 60)) {
     '. Cadastrar os feriados seguintes.');
 }
 
+// 9. Painel (enviados, descartados, respostas). Fonte: histórico de status do banco.
+const mov = {};
+for (const d of (fatos.movimentos_por_dia || [])) mov[String(d.dia).slice(0, 10)] = d;
+const n = (d, k) => Number((mov[d] || {})[k] || 0);
+let diaAnt = somaDias(hoje, -1);
+while (!diaUtil(diaAnt) && !(mov[diaAnt] && (n(diaAnt, 'enviados') || n(diaAnt, 'descartados')))) diaAnt = somaDias(diaAnt, -1);
+// Semana corrente (seg até hoje); na segunda de manhã mostra a semana passada inteira.
+const ehSegunda = new Date(hoje + 'T12:00:00Z').getUTCDay() === 1;
+const segunda = somaDias(hoje, -((new Date(hoje + 'T12:00:00Z').getUTCDay() + 6) % 7) - (manha && ehSegunda ? 7 : 0));
+const fimSemana = manha && ehSegunda ? somaDias(segunda, 6) : hoje;
+let semEnv = 0, semResp = 0;
+for (let d = segunda; d <= fimSemana; d = somaDias(d, 1)) { semEnv += n(d, 'enviados'); semResp += n(d, 'respondidos'); }
+const taxa = semEnv ? Math.round(100 * semResp / semEnv) + '%' : '-';
+const aprovar = botoes.filter(b => b.status === 'AGUARDANDO_APROVACAO' && new Date(b.expires_at) > agora).length;
+const marcar = botoes.filter(b => b.status === 'PRONTO_PARA_ENVIO' && new Date(b.expires_at) > agora).length;
+const semana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const rotulo = ymd => semana[new Date(ymd + 'T12:00:00Z').getUTCDay()] + ' ' + ymd.slice(8, 10) + '/' + ymd.slice(5, 7);
+const amanhaTxt = (prox === hoje ? 'Hoje' : 'Amanhã') + ' às 9h: <b>' + Math.min(devidos.length, LIMITE_SEGURANCA) + '</b> aprovações · <b>' +
+  fupProx.length + '</b> follow-ups';
+
+// 10. Mensagem: curta, um número por linha, alertas só quando existem.
 const temAlerta = alertas.length > 0;
-const enviar = manha || temAlerta;
-let texto = (temAlerta ? '🚨' : atencao.length ? '⚠️' : '✅') + ' <b>Vigia ' + (manha ? 'manhã' : 'tarde') + '</b> · ' + fmt(agora) + '\n';
-if (alertas.length) texto += '\n<b>Falhas</b>\n' + alertas.map(a => '• ' + a).join('\n') + '\n';
-if (atencao.length) texto += '\n<b>Atenção</b>\n' + atencao.map(a => '• ' + a).join('\n') + '\n';
-texto += '\n' + info.join('\n');
-if (!alertas.length && !atencao.length) texto += '\n\nTudo funcionando.';
+const enviar = manha || noite || temAlerta;
+const linhas = [];
+if (noite) {
+  linhas.push('🌙 <b>Fechamento do dia</b> · ' + rotulo(hoje), '');
+  linhas.push('✉️ Enviados: <b>' + n(hoje, 'enviados') + '</b>');
+  linhas.push('🗑 Descartados: <b>' + n(hoje, 'descartados') + '</b>');
+  linhas.push('💬 Respostas: <b>' + n(hoje, 'respondidos') + '</b>');
+  if (aprovar || marcar) {
+    linhas.push('⏳ Esperando você: <b>' + aprovar + '</b> para aprovar' + (marcar ? ' · <b>' + marcar + '</b> para marcar enviada' : ''));
+  }
+  linhas.push('', '📅 ' + amanhaTxt);
+} else if (manha) {
+  linhas.push('☀️ <b>Bom dia</b> · ' + rotulo(hoje), '');
+  linhas.push('📅 ' + amanhaTxt, '');
+  linhas.push((diaAnt === somaDias(hoje, -1) ? 'Ontem' : 'Último dia útil') + ' (' + rotulo(diaAnt) + '): ' +
+    n(diaAnt, 'enviados') + ' enviados · ' + n(diaAnt, 'descartados') + ' descartados · ' + n(diaAnt, 'respondidos') + ' respostas');
+  linhas.push((manha && ehSegunda ? 'Semana passada' : 'Semana') + ': ' + semEnv + ' enviados · ' + semResp + ' respostas (' + taxa + ' de resposta)');
+} else {
+  linhas.push('🚨 <b>Vigia</b> · ' + fmt(agora));
+}
+if (alertas.length) linhas.push('', '🚨 <b>Falhas</b>', ...alertas.map(a => '• ' + a));
+if (atencao.length) linhas.push('', '⚠️ <b>Atenção</b>', ...atencao.map(a => '• ' + a));
+if (!alertas.length && !atencao.length) linhas.push('', '✅ Tudo funcionando.');
+const texto = linhas.join('\n');
 
 return [{ json: { enviar, tem_alerta: temAlerta, alertas: alertas.length, atencao: atencao.length, telegram_text: texto.slice(0, 4000) } }];
