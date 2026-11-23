@@ -1,0 +1,3 @@
+{"workflowId":"xmshrOsfUkWSBfnG","name":"WF-NOTIFY - Telegram Outbox - Rufino LinkedIn DEV","versionId":"0da7e069-ecfb-4654-98b4-a3b48432e807",
+"nota":"Backup parcial: so o no alterado em 23/11 (Build Delivery Message). A versao completa esta no historico do n8n pelo versionId.",
+"node":{"id":"f3e5387d-76fc-4006-b97d-a3b951c63ed8","name":"Build Delivery Message","type":"n8n-nodes-base.set","typeVersion":3.4,"position":[1140,420],"parameters":{"mode":"manual","includeOtherFields":true,"assignments":{"assignments":[{"id":"d1","name":"telegram_chat_id","type":"string","value":"5550833898"},{"id":"d2","name":"telegram_text","type":"string","value":"={{ String($json.message_body ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') }}"}]}}}}
