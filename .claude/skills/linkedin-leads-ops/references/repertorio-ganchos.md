@@ -43,6 +43,11 @@ terceiriza.
    > lugar, mas já não lembro qual é a segunda à direita depois do mercadinho. Rsrs Imagino que na escola tenha
    > acontecido algo parecido: as ferramentas mudaram muito, mas algumas coisas continuam valendo como sempre, e
    > talvez sejam justamente as que a gente mais esquece."
+
+   Variação com o detalhe da rotina (bom para conversa já aberta ou post): "Eu montava os roteiros de visita
+   no guia, agrupando as escolas por região, no máximo 5 km uma da outra, para otimizar o dia. Dava trabalho,
+   mas era um exercício de estratégia. Hoje o aplicativo decide por mim, e eu não lembro mais do posto da
+   esquina."
 2. **O celular foi feito para ligar** (bom para follow-up ou para propor uma conversa):
    > "O celular, na essência, foi feito para ligar, e hoje é o que menos fazemos, quase como se fosse invasivo.
    > Rsrs Uma conversa de 20 minutos às vezes resolve o que dez mensagens não resolvem."
