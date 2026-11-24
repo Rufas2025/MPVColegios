@@ -87,6 +87,17 @@ NOVO → AGUARDANDO_D1 → AGUARDANDO_APROVACAO → APROVADO → PRONTO_PARA_ENV
 - **Follow-up:** "Marcar como enviada" agenda +3 dias a partir do toque; o lembrete sai às 9h do dia útil seguinte ao vencimento. "Sem resposta" agenda mais +3 dias; "Respondeu" encerra.
 - **Validade dos botões:** aprovação/entrega 7 dias (`action_tokens`); follow-up 7 dias (claim, migração 015). Botão vencido mostra ⚠️ e não grava nada.
 
+## Mensagens personalizadas e respostas
+
+- Repertório de ganchos (seção Experiência do perfil), perguntas, analogias do Anderson, contexto de mercado e
+  casos-modelo: `references/repertorio-ganchos.md`. Usar antes de sugerir texto para um lead.
+- **Botão "Editar" do Telegram está quebrado** (link de formulário nunca configurado no WF-ROUTER): consome a
+  aprovação e deixa o contato sem botão. Até a correção: "Aprovar e preparar", colar o texto personalizado no
+  LinkedIn e "Marcar como enviada". Se o Anderson já tocou "Editar", gravar o texto com `save_message_edit` pela
+  credencial DDL (modelo em `db/ops/2026-11-24_editar_maria_aparecida.sql`).
+- Encerrar cadência antes do lembrete (respondeu, rede com contrato): modelo em
+  `db/ops/2026-11-24_encerrar_followups.sql`.
+
 ## Diagnóstico
 
 Consultas prontas em `references/diagnostico-sql.md`. Rode só leitura, pelo workflow `99 - TEMP Manual SQL`
