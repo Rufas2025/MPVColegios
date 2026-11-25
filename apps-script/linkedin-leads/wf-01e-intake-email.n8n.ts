@@ -381,6 +381,44 @@ const registrar = node({
   }
 });
 
+// Pesquisa pública do contato (ZWqtktf4sCQQ9MuX), ligada pela sessão da pesquisa em 25/11/2026 (autorizado por
+// Anderson): roda sem esperar depois do cadastro; o WF-NOTIFY mostra o bloco no cartão de aprovação.
+// Falha aqui nunca bloqueia o cadastro nem a resposta ao Apps Script (onError: continuar).
+const pesquisar = node({
+  type: 'n8n-nodes-base.executeWorkflow',
+  version: 1.3,
+  config: {
+    name: 'Disparar Pesquisa Pública',
+    onError: 'continueRegularOutput',
+    parameters: {
+      source: 'database',
+      workflowId: { __rl: true, mode: 'id', value: 'ZWqtktf4sCQQ9MuX' },
+      workflowInputs: {
+        mappingMode: 'defineBelow',
+        value: {
+          contato_id: expr("{{ $json.connection_id }}"),
+          nome: expr("{{ $('Somente Registrar').item.json.nome }}"),
+          titulo: expr("{{ $('Somente Registrar').item.json.headline || '' }}"),
+          escola: expr("{{ $('Somente Registrar').item.json.escola || '' }}"),
+          cidade: ''
+        },
+        matchingColumns: [],
+        schema: [
+          { id: 'contato_id', displayName: 'contato_id', type: 'string', display: true, required: false, defaultMatch: false, canBeUsedToMatch: true },
+          { id: 'nome', displayName: 'nome', type: 'string', display: true, required: false, defaultMatch: false, canBeUsedToMatch: true },
+          { id: 'titulo', displayName: 'titulo', type: 'string', display: true, required: false, defaultMatch: false, canBeUsedToMatch: true },
+          { id: 'escola', displayName: 'escola', type: 'string', display: true, required: false, defaultMatch: false, canBeUsedToMatch: true },
+          { id: 'cidade', displayName: 'cidade', type: 'string', display: true, required: false, defaultMatch: false, canBeUsedToMatch: true }
+        ],
+        attemptToConvertTypes: false,
+        convertFieldsToString: true
+      },
+      mode: 'each',
+      options: { waitForSubWorkflow: false }
+    }
+  }
+});
+
 // ORDEM DOS RAMOS (importante): o n8n (executionOrder v1) executa os ramos
 // que saem de "Decidir" de cima para baixo no canvas. "Responder ao Script"
 // precisa ficar POR ÚLTIMO (mais abaixo), depois de "Registrar Conexao":
@@ -398,5 +436,6 @@ export default workflow('wf-01e', 'WF-01E - Intake por E-mail (Apps Script) - Ru
   .add(decidir)
   .to(filtro)
   .to(registrar)
+  .to(pesquisar)
   .add(decidir)
   .to(responder);
