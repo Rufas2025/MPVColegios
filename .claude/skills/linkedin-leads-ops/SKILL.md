@@ -91,10 +91,11 @@ NOVO → AGUARDANDO_D1 → AGUARDANDO_APROVACAO → APROVADO → PRONTO_PARA_ENV
 
 - Repertório de ganchos (seção Experiência do perfil), perguntas, analogias do Anderson, contexto de mercado e
   casos-modelo: `references/repertorio-ganchos.md`. Usar antes de sugerir texto para um lead.
-- **Botão "Editar" do Telegram está quebrado** (link de formulário nunca configurado no WF-ROUTER): consome a
-  aprovação e deixa o contato sem botão. Até a correção: "Aprovar e preparar", colar o texto personalizado no
-  LinkedIn e "Marcar como enviada". Se o Anderson já tocou "Editar", gravar o texto com `save_message_edit` pela
-  credencial DDL (modelo em `db/ops/2026-11-24_editar_maria_aparecida.sql`).
+- **Editar (desde 25/11):** tocar "Editar" no cartão → o bot pede o texto novo → responder àquela mensagem com o
+  texto pronto → nova versão (`human_edit`) e cartão de aprovação novo. O link de edição fica escondido no ✏️ e vale
+  48h. Se passar disso, a pessoa fica sem botão (o vigia acusa): gravar com `save_message_edit` pela credencial DDL
+  (modelo em `db/ops/2026-11-24_editar_maria_aparecida.sql`). Mensagens com `source = 'human_edit'` são as
+  personalizadas: base para comparar a taxa de resposta com o texto padrão.
 - Encerrar cadência antes do lembrete (respondeu, rede com contrato): modelo em
   `db/ops/2026-11-24_encerrar_followups.sql`.
 
