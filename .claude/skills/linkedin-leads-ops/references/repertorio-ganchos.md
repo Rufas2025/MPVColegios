@@ -15,6 +15,30 @@ Anderson vê ao abrir o perfil: ele cola o trecho aqui e a mensagem sai personal
 - Redes com contrato direto com a Eduinfo **não recebem abordagem**: Grupo Salta (inclui as marcas do grupo) e
   rede Adventista. Na dúvida sobre a rede, perguntar ao Anderson antes de aprovar.
 
+## Tom (Anderson, 25/11/2026)
+
+- **Humildade e escuta, não aula.** Nunca dizer à escola como ela funciona ou deveria funcionar (nada de "revisar
+  como espaços e tecnologia conversam com o que ensinam", "menos remendo").
+- Os 15 anos entram como **percepção**, não como currículo: "depois de 15 anos no segmento, percebo o quanto a
+  educação mudou", com o desafio de manter os alunos conectados e engajados.
+- O aprendizado vem das conversas com lideranças pedagógicas, gestores e mantenedores: "aprendo muito com essas
+  conversas". Sênior e estratégico, mas quem escuta.
+- Cada escola tem a sua história (42 mil colégios, nenhum igual): por isso começar ouvindo.
+- Evitar "Estou no segmento educacional há cerca de 15 anos e..." como abertura de parágrafo.
+
+## Tempo de casa (lido pelo Anderson na Experiência)
+
+O e-mail de aceite não traz datas. O Anderson abre o perfil e informa: tempo na escola, tempo no cargo atual, cargos
+anteriores e se é fundador(a)/mantenedor(a). Nunca raspar o perfil.
+
+| Experiência | Abertura |
+|---|---|
+| Menos de 2 anos no cargo | "Vi que você assumiu a direção há pouco tempo, depois de [N] anos como [cargo anterior]." |
+| 3 a 9 anos | "São [N] anos na direção da [escola]." |
+| 10 anos ou mais | "Há [N] anos na direção. Parabéns pela jornada! É muita história." |
+| Subiu dentro da escola | "Vi que você começou como [cargo] e hoje está na direção." |
+| Fundador(a) ou mantenedor(a) | "Vi que você fundou a [escola] e segue à frente dela há [N] anos." |
+
 ## Ganchos da seção Experiência
 
 | O que aparece | Leitura | Modelo de frase |
