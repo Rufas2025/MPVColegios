@@ -108,26 +108,42 @@ function extrairEscola(headline) {
   return null;
 }
 
-function mensagem(primeiro, g, escola) {
+// Modelo v2 (Anderson, 25/11/2026): tom de escuta, curto, uma pergunta fácil no fim.
+// A pergunta muda pelo perfil do cargo (hipótese pelo título, nunca diagnóstico):
+//   mantenedor/fundador/sócio/CEO -> números da escola (captação e rematrícula);
+//   direção pedagógica, coordenação, diretor de ensino -> engajamento dos alunos;
+//   demais diretores (geral, escolar, unidade) -> equilíbrio entre pedagógico e números.
+var PERFIL_MANT = /(mantenedor|mantenedora|fundador|fundadora|founder|\\bsoci[oa]\\b|proprietari|\\bowner\\b|\\bceo\\b|presidente)/;
+var PERFIL_PED = /(pedagogic|coordenador|coordenadora|coordenacao|academic|diretora? de ensino)/;
+function perfilPergunta(headline) {
+  var h = semAcento(headline);
+  if (PERFIL_MANT.test(h)) return 'MANTENEDOR';
+  if (PERFIL_PED.test(h)) return 'PEDAGOGICO';
+  return 'GESTAO';
+}
+
+function mensagem(primeiro, g, escola, headline) {
   var saud = g === 'M' ? 'Fala' : 'Olá';
   var agr = g === 'M' ? 'Valeu' : 'Obrigado';
   var abertura = '';
+  var local = ' aí';
   if (escola) {
-    var art = /^(col[eé]gio|grupo|instituto|centro|sistema|educand[aá]rio|liceu|externato|complexo|ensino)/i.test(escola) ? 'do' : 'da';
-    abertura = 'Vi que você está à frente ' + art + ' ' + escola + '. ';
+    var masc = /^(col[eé]gio|grupo|instituto|centro|sistema|educand[aá]rio|liceu|externato|complexo|ensino)/i.test(escola);
+    abertura = 'Vi que você está à frente ' + (masc ? 'do' : 'da') + ' ' + escola + '. ';
+    local = ' aí ' + (masc ? 'no' : 'na') + ' ' + escola;
   }
+  var perfil = perfilPergunta(headline);
+  var objetivo = perfil === 'MANTENEDOR' ? 'manter a captação e a rematrícula em alta'
+    : perfil === 'PEDAGOGICO' ? 'manter os alunos engajados'
+    : 'equilibrar o pedagógico com os números da escola';
   return [
     saud + ', ' + primeiro + '! Tudo bem?',
     '',
     agr + ' por ter aceito o meu convite aqui no LinkedIn!',
     '',
-    abertura + 'Estou no segmento educacional há cerca de 15 anos e, depois de tantas conversas com diretores e mantenedores pelo Brasil, aprendi uma coisa: tempo talvez seja um dos recursos mais escassos na gestão escolar. Rsrs',
+    abertura + 'Depois de 15 anos no segmento educacional, percebo o quanto a educação mudou, e cada escola tem a sua história. Conversar com quem está na liderança é o que mais me ensina.',
     '',
-    'Imagino que sua cabeça já esteja em 2027. São 200 dias letivos para organizar, feriados para encaixar, calendário, equipe, orçamento, metas de rematrícula e retenção... tudo isso enquanto 2026 ainda está acontecendo!',
-    '',
-    primeiro + ', sei que ainda não nos conhecemos, mas gostaria genuinamente de te ouvir: qual é hoje o seu maior desafio para 2027?',
-    '',
-    'Não quero tomar seu tempo com uma apresentação comercial. Prefiro começar entendendo o que realmente está na sua mesa.',
+    primeiro + ', o que tem funcionado' + local + ' para ' + objetivo + '?',
     '',
     'Grande abraço,',
     'Rufino'
@@ -174,7 +190,7 @@ for (var i = 0; i < eventos.length; i++) {
     profile_url: 'https://www.linkedin.com/in/' + slug + '/',
     profile_url_norm: 'https://www.linkedin.com/in/' + slug,
     idempotency_key: 'li-' + slug,
-    mensagem: cl.c === 'ICP' ? mensagem(primeiro, g, escola) : null,
+    mensagem: cl.c === 'ICP' ? mensagem(primeiro, g, escola, headline) : null,
     ganchos: JSON.stringify([{ gancho: escola || headline || 'aceite do convite', motivo: 'titulo do perfil no e-mail de aceite do LinkedIn' }])
   }) });
 }
@@ -350,7 +366,7 @@ const registrar = node({
     p_confianca                    => 0.6,
     p_sensivel                     => false,
     p_alertas                      => $12::jsonb,
-    p_brain_version                => 'intake-email-template-v1',
+    p_brain_version                => 'intake-email-template-v2',
     p_mensagem                     => $13,
     p_workflow_name                => 'WF-01E',
     p_execution_id                 => $14,
@@ -358,7 +374,7 @@ const registrar = node({
     p_data_conexao_confirmado_por  => 'sistema:email-linkedin'
 );`,
       options: {
-        queryReplacement: expr("{{ [ $json.idempotency_key, $json.nome, $json.primeiro_nome, $json.cargo, $json.escola, $json.profile_url, $json.data_conexao, $json.headline, $json.ganchos, 'Tempo escasso na gestão e planejamento de 2027', 'Entrada automática pelo e-mail de aceite do LinkedIn; modelo aprovado por Anderson em 20/11/2026', '[]', $json.mensagem, String($execution.id) ] }}")
+        queryReplacement: expr("{{ [ $json.idempotency_key, $json.nome, $json.primeiro_nome, $json.cargo, $json.escola, $json.profile_url, $json.data_conexao, $json.headline, $json.ganchos, 'Escuta: o que tem funcionado (pergunta pelo perfil do cargo)', 'Entrada automática pelo e-mail de aceite do LinkedIn; modelo v2 (tom de escuta) aprovado por Anderson em 25/11/2026', '[]', $json.mensagem, String($execution.id) ] }}")
       }
     },
     credentials: { postgres: newCredential('Rufino LinkedIn DEV') }
