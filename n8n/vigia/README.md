@@ -46,6 +46,11 @@ Criado **desativado** no n8n: `WF-90 - Vigia (relatório e alertas) - Rufino Lin
 - execução 2060, tarde sem falha: não envia;
 - execução 2061, falha simulada no WF-02: alerta com workflow, nó, erro e link da execução.
 
+## Estado (25/11/2026)
+
+**Ativo** desde 25/11 (versão `5b2b152f`), autorizado por Anderson. `errorWorkflow` apontado para o WF-90 nos cinco
+workflows da cadência (WF-01E, WF-02, WF-05, WF-NOTIFY, WF-ROUTER). Primeiro relatório real: 25/11 8h40.
+
 ## Implantação (cada item precisa de autorização)
 
 1. Validar o código no n8n (`validate_workflow`), conferindo os parâmetros do nó de tabela de dados com `get_node_types`.

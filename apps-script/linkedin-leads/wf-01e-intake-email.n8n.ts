@@ -62,11 +62,16 @@ var APOIO_DIRECAO = /(assistente|auxiliar|secretari[ao]|apoio) (de |da )?direcao
 // Coordenação geral pode ser quem decide em algumas escolas: vai para revisão do Anderson, não para fora.
 var COORD_GERAL = /(coordenador|coordenadora|coordenacao) geral/;
 var ESCOLA_CTX = /(colegio|\\bescola\\b|escolar|school|educacional|educacao|ensino|pedagogic|maple bear|bilingue|infantil|instituto|educandario|liceu)/;
+// Redes com contrato direto com a Eduinfo (Anderson, 23 e 25/11/2026): não recebem abordagem.
+// Grupo Salta e suas marcas (Elite, Ábaco, Anglo Alante, Coleguium, Pensi, pH) e a rede Adventista.
+// Não entram na cadência; aparecem no aviso do Telegram para o Anderson poder resgatar um falso positivo.
+var REDE_EDUINFO = /(\\bsalta\\b|elite rede|rede elite|colegio elite|sistema elite|\\babaco\\b|anglo alante|\\bcolegu?ium\\b|\\bpensi\\b|colegio ph\\b|rede ph\\b|adventist|\\biasd\\b|uniao (norte|sul|leste|nordeste|sudeste|noroeste|central|centro[ -]oeste)[ -]brasileira)/;
 var NAO_DECISOR = /(coordenador|coordenadora|coordenacao|orientador|orientadora|orientacao|professor|professora|analista|assistente|supervisor|supervisora)/;
 
 function classificar(headline) {
   var h = semAcento(headline);
   if (!h) return { c: 'REVISAR', motivo: 'e-mail sem cargo' };
+  if (REDE_EDUINFO.test(h)) return { c: 'REDE_EDUINFO', motivo: 'rede com contrato direto com a Eduinfo (Grupo Salta ou Adventista): fora da cadência' };
   var decisor = DECISOR.test(h) && !(APOIO_DIRECAO.test(h) && !/(diretor|diretora|mantenedor|ceo|fundador|socio|socia)/.test(h));
   var escola = ESCOLA_CTX.test(h);
   if (FORTE_FORA.test(h)) return { c: 'FORA_ICP', motivo: 'fornecedor, governo/rede publica ou area comercial' };
@@ -257,7 +262,7 @@ var amostra = null;
 if (!real) {
   lista.push('<b>TESTE do recebimento por e-mail: nada foi gravado</b>');
   if (itens.length === 1 && itens[0].status === 'SEM_EVENTOS') lista.push('Nenhum aceite no pacote recebido.');
-  var rotulo = { SIMULADO_ICP: 'ICP', JA_CADASTRADO: 'JA CADASTRADO', FORA_ICP: 'FORA DO ICP', REVISAR: 'REVISAR', INVALIDO: 'NAO LIDO' };
+  var rotulo = { SIMULADO_ICP: 'ICP', JA_CADASTRADO: 'JA CADASTRADO', FORA_ICP: 'FORA DO ICP', REVISAR: 'REVISAR', INVALIDO: 'NAO LIDO', REDE_EDUINFO: 'REDE COM CONTRATO EDUINFO' };
   itens.forEach(function (j) {
     if (j.status === 'SEM_EVENTOS') return;
     lista.push('');
@@ -269,7 +274,7 @@ if (!real) {
     if (!amostra && j.mensagem) amostra = j;
   });
 } else {
-  var atencao = itens.filter(function (j) { return j.status === 'REVISAR' || j.status === 'INVALIDO'; });
+  var atencao = itens.filter(function (j) { return j.status === 'REVISAR' || j.status === 'INVALIDO' || j.status === 'REDE_EDUINFO'; });
   if (atencao.length === 0) return [];
   lista.push('<b>Aceite para você revisar</b> (não entrou na cadência)');
   atencao.forEach(function (j) {
