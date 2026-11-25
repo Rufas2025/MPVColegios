@@ -42,7 +42,10 @@ function limparNome(n) {
 
 var FEM = new Set(['raquel','isabel','mabel','ingrid','ruth','ester','esther','carmen','karen','ellen','suellen','evelyn','jocelyn','miriam','myriam','beatriz','thais','tais','ines','iris','liz','lis','abigail','rachel','lourdes','mercedes','doris']);
 var MASC = new Set(['felipe','filipe','henrique','jorge','alexandre','jose','andre','guilherme','vicente','clemente','dante','duarte','jaime','rene','onofre','davi','levi','ravi','luca','wesley','sidney','rodney','rudney']);
-function genero(primeiro) {
+// 25/11/2026: cargo no feminino no título decide antes do nome (ex.: "Lisamar", terminado em consoante, é "Diretora").
+var CARGO_FEM = /\\b(diretora|coordenadora|fundadora|mantenedora|professora|socia|proprietaria|gestora|supervisora|orientadora|presidenta)\\b/;
+function genero(primeiro, headline) {
+  if (headline && CARGO_FEM.test(semAcento(headline))) return 'F';
   var p = semAcento(primeiro).replace(/[^a-z]/g, '');
   if (!p) return 'N';
   if (FEM.has(p)) return 'F';
@@ -180,7 +183,7 @@ for (var i = 0; i < eventos.length; i++) {
   }
   var cl = classificar(headline);
   var escola = extrairEscola(headline);
-  var g = genero(primeiro);
+  var g = genero(primeiro, headline);
   saida.push({ json: Object.assign(base, {
     classificacao: cl.c,
     motivo: cl.motivo,
