@@ -108,7 +108,8 @@ NOVO → AGUARDANDO_D1 → AGUARDANDO_APROVACAO → APROVADO → PRONTO_PARA_ENV
   token de aprovação antigo na mesma transação. Modelo com travas que pulam quem já foi aprovado ou editado:
   `db/ops/2026-11-25_modelo_v2_cartoes_de_hoje.sql`.
 - **Pesquisa pública do contato** (`ZWqtktf4sCQQ9MuX`, Brave + BrasilAPI + Claude Haiku, sem LinkedIn): roda
-  sozinha a cada cadastro (WF-01E) e o bloco "Pesquisa pública" aparece no cartão de aprovação (WF-NOTIFY). Acha algo
+  sozinha a cada cadastro (WF-01E) e fica gravada em `contact_research` para escrever as mensagens. **Não vai para o
+  cartão de aprovação** (pedido do Anderson, 25/11: o cartão é só a mensagem, objetiva). Acha algo
   útil em cerca de 1 de cada 3 contatos; tempo de casa quase nunca. Confiança baixa ou homônimo = não usar. Para
   testar sem gravar, chamar com `contato_id` que não seja UUID.
 

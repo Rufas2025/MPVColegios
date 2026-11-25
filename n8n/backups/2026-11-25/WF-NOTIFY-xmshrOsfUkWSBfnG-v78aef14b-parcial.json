@@ -1,0 +1,17 @@
+{
+  "workflowId": "xmshrOsfUkWSBfnG",
+  "versionId": "78aef14b-332a-40e4-81b5-7bd3bcd2ca12",
+  "nota": "Backup parcial antes de tirar o bloco de pesquisa pública do cartão de aprovação (pedido do Anderson, 25/11/2026). Só o nó Build Approval Message muda; os nós Buscar Pesquisa Pública e Juntar Pesquisa ficam.",
+  "nodes": {
+    "Build Approval Message": {
+      "mode": "manual",
+      "includeOtherFields": true,
+      "assignments": {
+        "assignments": [
+          { "id": "c1", "name": "telegram_chat_id", "type": "string", "value": "5550833898" },
+          { "id": "c2", "name": "telegram_text", "type": "string", "value": "=<b>Nova conexão no LinkedIn</b>\n\n{{ String($json.nome ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') }}{{ $json.cargo ? ' – ' + String($json.cargo).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') : '' }}{{ $json.instituicao ? ' em ' + String($json.instituicao).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') : '' }}{{ $json.cidade ? '\\n' + String($json.cidade).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') : '' }}\n\nMensagem proposta:\n{{ String($json.message_body ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') }}{{ $json.pesquisa_bloco ? '\\n\\n<b>Pesquisa pública</b> (confira as fontes antes de usar)\\n' + $json.pesquisa_bloco : '' }}" }
+        ]
+      }
+    }
+  }
+}
