@@ -29,6 +29,25 @@ Anderson vê ao abrir o perfil: ele cola o trecho aqui e a mensagem sai personal
 - Cada escola tem a sua história (42 mil colégios, nenhum igual): por isso começar ouvindo.
 - Evitar "Estou no segmento educacional há cerca de 15 anos e..." como abertura de parágrafo.
 
+## O jeito do Anderson (aprendido nas mensagens de 25/11)
+
+Use como padrão para escrever sem precisar dele a cada contato:
+
+1. **Lê a trajetória, não só o cargo:** de onde a pessoa veio, para onde foi, há quanto tempo. Mudança de escola
+   ou de rede = mudança de cultura ("cada colégio tem a sua cultura"); vale perguntar como foi a adaptação.
+2. **Ponte pessoal real, quando existir:** conhece alguém da rede, já esteve no lugar, sabe a origem da rede
+   (ex.: Bernoulli nasceu em BH; a Decisão é de São Paulo; a Fundação Bradesco fica na Cidade de Deus, em Osasco).
+   **Só usar o que o Anderson disse.** Nunca inventar conhecido, visita ou conversa.
+3. **Humor leve e autoironia**, com "Rsrs". Pode brincar com a própria intenção de forma honesta (ex.: "como
+   entrar por São Paulo é desafiador, resolvi tentar por Minas"), seguido de "brincadeiras à parte".
+4. **Desejo sincero e porta aberta**, sem pedir reunião: "desejo muito sucesso nessa fase", "vai ser um prazer
+   trocar umas ideias mais para frente".
+5. **Pergunta sobre a experiência da pessoa**, fácil de responder: "como foi esse primeiro ano?", "como tem sido
+   essa adaptação?", "como tem sido liderar a unidade?". Uma só, no fim.
+6. **Curta.** Agradecimento, gancho, ponte ou humor, desejo, pergunta. Sem os 15 anos quando o gancho do perfil
+   já é forte.
+7. **Descarta rápido** quem não é ICP ao ver a Experiência (rede pública, secretaria, ensino superior).
+
 ## Tempo de casa (lido pelo Anderson na Experiência)
 
 O e-mail de aceite não traz datas. O Anderson abre o perfil e informa: tempo na escola, tempo no cargo atual, cargos
