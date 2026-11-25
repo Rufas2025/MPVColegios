@@ -98,6 +98,19 @@ NOVO → AGUARDANDO_D1 → AGUARDANDO_APROVACAO → APROVADO → PRONTO_PARA_ENV
   personalizadas: base para comparar a taxa de resposta com o texto padrão.
 - Encerrar cadência antes do lembrete (respondeu, rede com contrato): modelo em
   `db/ops/2026-11-24_encerrar_followups.sql`.
+- **Modelo v2 da mensagem padrão (desde 25/11, `brain_version = intake-email-template-v2`):** tom de escuta, curto,
+  uma pergunta pelo perfil do cargo no título (mantenedor/fundador/CEO → captação e rematrícula; pedagógico,
+  coordenação, diretor de ensino → alunos engajados; demais diretores → pedagógico e números). Cargo no feminino no
+  título decide a saudação antes do nome. Comparar respostas v1 × v2 × `human_edit`.
+- **Rotina combinada com o Anderson (25/11):** dia a dia vai a mensagem padrão (ele aprova até na rua); a
+  personalização caprichada (print da Experiência + resposta da pessoa) fica para quem **responde**.
+- **Trocar a mensagem de cartões já emitidos:** `save_message_edit` só vale em `AGUARDANDO_APROVACAO`; consumir o
+  token de aprovação antigo na mesma transação. Modelo com travas que pulam quem já foi aprovado ou editado:
+  `db/ops/2026-11-25_modelo_v2_cartoes_de_hoje.sql`.
+- **Pesquisa pública do contato** (`ZWqtktf4sCQQ9MuX`, Brave + BrasilAPI + Claude Haiku, sem LinkedIn): roda
+  sozinha a cada cadastro (WF-01E) e o bloco "Pesquisa pública" aparece no cartão de aprovação (WF-NOTIFY). Acha algo
+  útil em cerca de 1 de cada 3 contatos; tempo de casa quase nunca. Confiança baixa ou homônimo = não usar. Para
+  testar sem gravar, chamar com `contato_id` que não seja UUID.
 
 ## Diagnóstico
 
