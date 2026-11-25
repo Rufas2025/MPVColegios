@@ -14,6 +14,9 @@ Anderson vê ao abrir o perfil: ele cola o trecho aqui e a mensagem sai personal
 - Nada comercial na primeira mensagem: "Prefiro começar entendendo o que realmente está na sua mesa."
 - Redes com contrato direto com a Eduinfo **não recebem abordagem**: Grupo Salta (inclui as marcas do grupo) e
   rede Adventista. Na dúvida sobre a rede, perguntar ao Anderson antes de aprovar.
+- **Rede pública não é ICP.** Título genérico ("Diretor escolar", "Diretora Escolar") sem nome de escola pede
+  conferir a Experiência: secretaria de educação (estadual ou municipal) → descartar. Caso de 25/11: diretor
+  escolar da Secretaria da Educação do Estado de São Paulo.
 
 ## Tom (Anderson, 25/11/2026)
 
