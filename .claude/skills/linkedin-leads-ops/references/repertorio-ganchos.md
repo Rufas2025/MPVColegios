@@ -38,6 +38,10 @@ anteriores e se é fundador(a)/mantenedor(a). Nunca raspar o perfil.
 | 10 anos ou mais | "Há [N] anos na direção. Parabéns pela jornada! É muita história." |
 | Subiu dentro da escola | "Vi que você começou como [cargo] e hoje está na direção." |
 | Fundador(a) ou mantenedor(a) | "Vi que você fundou a [escola] e segue à frente dela há [N] anos." |
+| Chegou a uma escola nova há menos de 1 ano, depois de muitos anos em outra | "Vi que você chegou ao [escola nova] este ano, depois de [N] anos no [escola anterior]." Pergunta: "Como foi esse primeiro ano para você?" (cada colégio tem a sua cultura). |
+
+Formato curto (Anderson, 25/11): quando o perfil der um gancho forte, mensagem curta e de impacto, que mostre que
+ele leu o perfil. Sem os 15 anos, sem contexto de mercado: agradecimento, o gancho, um desejo sincero e uma pergunta.
 
 ## Ganchos da seção Experiência
 
