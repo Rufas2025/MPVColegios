@@ -48,6 +48,15 @@ Use como padrão para escrever sem precisar dele a cada contato:
    já é forte.
 7. **Descarta rápido** quem não é ICP ao ver a Experiência (rede pública, secretaria, ensino superior).
 
+## Regra de 25/11/2026 (Anderson aprovou o formato do Leonardo)
+
+- **Sempre citar a escola atual pelo nome** (do título, do cadastro ou da pesquisa pública). Sem escola conhecida, o
+  cartão avisa e a frase sai sem ela.
+- **Tempo de casa quando houver fonte**: "na direção pedagógica do Colégio X desde 2024, depois de passar pela
+  coordenação geral da escola". Nunca estimar. Fonte de agregador (RocketReach, ZoomInfo) = conferir antes de enviar.
+- **Gancho do momento da escola** quando houver (programa novo, aquisição, evento, prêmio), com "Parabéns".
+- **Sempre terminar com uma pergunta fácil**, ligada ao gancho ("como tem sido a recepção das famílias ao programa?").
+
 ## Tempo de casa (lido pelo Anderson na Experiência)
 
 O e-mail de aceite não traz datas. O Anderson abre o perfil e informa: tempo na escola, tempo no cargo atual, cargos
