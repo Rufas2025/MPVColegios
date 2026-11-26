@@ -112,6 +112,13 @@ NOVO → AGUARDANDO_D1 → AGUARDANDO_APROVACAO → APROVADO → PRONTO_PARA_ENV
   cartão de aprovação** (pedido do Anderson, 25/11: o cartão é só a mensagem, objetiva). Acha algo
   útil em cerca de 1 de cada 3 contatos; tempo de casa quase nunca. Confiança baixa ou homônimo = não usar. Para
   testar sem gravar, chamar com `contato_id` que não seja UUID.
+- **WF-06 Mensagem Personalizada** (`djZXn0euadA5Zg8h`, publicado 26/11, dias úteis 8h30): pega quem vira cartão
+  às 9h, com versão 1 do modelo e pesquisa alta/média; Claude Opus 5.5 escreve no formato aprovado
+  (`n8n/wf-06/prompt-sistema.txt`), `validar.js` confere (saudação, agradecimento, exatamente 2 `?`: "Tudo bem?" e a
+  pergunta final, 35 a 110 palavras, sem travessão/URL/aspas, assinatura) e `save_auto_message` (migração 016)
+  grava a versão 2 com `edited_by='auto-pesquisa:claude-opus-5-5'`. Se a IA recusar ou a validação falhar, fica o
+  modelo. Nunca mexe em cartão já emitido nem em edição humana. Custo ~US$ 0,03 por mensagem. Para comparar taxa de
+  resposta: `message_versions.edited_by LIKE 'auto-pesquisa:%'`.
 
 ## Diagnóstico
 
