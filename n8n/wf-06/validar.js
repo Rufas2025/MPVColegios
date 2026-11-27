@@ -1,4 +1,17 @@
 // Confere a mensagem escrita pela IA antes de gravar. Qualquer falha: não grava (fica a mensagem modelo).
+// 27/11: a mensagem tem que citar a escola atual (pesquisa ou cadastro); sem escola conhecida, fica o modelo.
+var GENERICAS = /^(colegio|escola|rede|centro|instituto|instituicao|educacional|educacao|ensino|unidade|grupo|sistema|associacao|fundacao|sociedade|integrado|particular)$/;
+function semAcento(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+function escolaDoBloco(b) {
+  var m = String(b || '').match(/<b>Escola atual:<\/b>\s*([^<]+)/);
+  return m ? m[1].replace(/\s+/g, ' ').trim() : null;
+}
+function citaEscola(msg, escola) {
+  var texto = semAcento(msg);
+  var palavras = semAcento(escola).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 3 && !GENERICAS.test(w) && !/^(dos?|das?|de)$/.test(w); });
+  if (!palavras.length) return texto.indexOf(semAcento(escola)) >= 0;
+  return palavras.some(function (w) { return new RegExp('\\b' + w + '\\b').test(texto); });
+}
 var saida = [];
 var pedidos = $('Montar Pedido').all();
 $input.all().forEach(function (it, i) {
@@ -24,6 +37,9 @@ $input.all().forEach(function (it, i) {
     var palavras = m.split(/\s+/).length;
     if (palavras > 110 || palavras < 35) throw new Error('tamanho fora do padrão: ' + palavras + ' palavras');
     if (m.indexOf(base.primeiro_nome) < 0) throw new Error('sem o primeiro nome');
+    var escola = escolaDoBloco(base.bloco_cartao) || base.instituicao || null;
+    if (!escola) throw new Error('escola atual não confirmada');
+    if (!citaEscola(m, escola)) throw new Error('mensagem não cita a escola (' + escola + ')');
     r.ok = true; r.mensagem = m; r.motivo = o.motivo || '';
     r.modelo_usado = resp.model || null;
   } catch (e) { r.motivo = String(e.message || e).slice(0, 300); }

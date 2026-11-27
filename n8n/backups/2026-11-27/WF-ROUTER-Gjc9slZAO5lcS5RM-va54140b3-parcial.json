@@ -1,0 +1,26 @@
+{
+  "workflowId": "Gjc9slZAO5lcS5RM",
+  "versionId": "a54140b3-408c-45c4-9cf0-57ef4b49a45b",
+  "motivo": "comando /respondeu (Anderson, 27/11): so acrescenta nos; nenhum no existente muda",
+  "connections_antes": {
+    "É Clique de Botão?": {
+      "main": [
+        [
+          {
+            "node": "Answer Callback Query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ler Resposta de Edição",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "rollback": "restaurar a versao a54140b3 pelo historico do n8n e publicar"
+}

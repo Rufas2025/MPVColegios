@@ -1,0 +1,31 @@
+{
+  "workflowId": "CxLUUmLpj3mA0nfz",
+  "versionId": "9baf1a46-ada3-4ba0-9d22-ef59628afd58",
+  "motivo": "seg-qui (Anderson, 27/11)",
+  "nodes": [
+    {
+      "name": "D+1 Dias Uteis 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0,
+              "weeksInterval": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

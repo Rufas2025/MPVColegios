@@ -1,0 +1,31 @@
+{
+  "workflowId": "W36Y8pew9wwaCb6d",
+  "versionId": "9ea9444c-9c3e-46fa-83b3-a425ec589a49",
+  "motivo": "seg-qui (Anderson, 27/11)",
+  "nodes": [
+    {
+      "name": "Follow-up Dias Uteis 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0,
+              "weeksInterval": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

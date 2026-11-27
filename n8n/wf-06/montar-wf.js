@@ -1,17 +1,20 @@
 // Gera wf-06-personalizar.n8n.ts a partir de consulta.sql, prompt-sistema.txt, montar.js e validar.js.
 const fs = require('fs');
 const q = fs.readFileSync(__dirname + '/consulta.sql', 'utf8').trim();
+// montar.gerado.js = montar.js com o prompt de prompt-sistema.txt embutido.
+const prompt = fs.readFileSync(__dirname + '/prompt-sistema.txt', 'utf8').trim();
+fs.writeFileSync(__dirname + '/montar.gerado.js', fs.readFileSync(__dirname + '/montar.js', 'utf8').replace('__SISTEMA__', JSON.stringify(prompt)));
 const montar = fs.readFileSync(__dirname + '/montar.gerado.js', 'utf8');
 const validar = fs.readFileSync(__dirname + '/validar.js', 'utf8');
 const ts = `import { workflow, node, trigger, newCredential, expr } from '@n8n/workflow-sdk';
 
 // WF-06: mensagem D+1 personalizada com a pesquisa pública (fase 2, autorizada por Anderson em 26/11/2026).
-// Dias úteis 8h30 (antes do WF-02 das 9h). Gerado por n8n/wf-06/montar-wf.js: editar os arquivos-fonte, não este.
+// Seg a qui 8h30 (antes do WF-02 das 9h; sexta fica para segunda, regra do Anderson 27/11). Gerado por n8n/wf-06/montar-wf.js: editar os arquivos-fonte, não este.
 
 const agenda = trigger({
   type: 'n8n-nodes-base.scheduleTrigger',
   version: 1.3,
-  config: { name: 'Dias úteis 8h30', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '0 30 8 * * 1-5' }] } } }
+  config: { name: 'Dias úteis 8h30', parameters: { rule: { interval: [{ field: 'cronExpression', expression: '0 30 8 * * 1-4' }] } } }
 });
 
 const contatos = node({

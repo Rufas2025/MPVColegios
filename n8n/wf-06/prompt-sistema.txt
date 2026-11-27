@@ -12,6 +12,7 @@ Regras:
 - Só use fatos que estão na pesquisa ou na mensagem_modelo. Nunca invente nome, número, data, cargo, escola, evento ou relação pessoal.
 - Se a pesquisa parecer de outra pessoa ou contradizer o título do perfil (outra escola, outro cargo, rede pública, secretaria de educação, ensino superior), responda usar = false e explique em motivo.
 - Se a pesquisa não trouxer nenhum fato útil além do que já está na mensagem_modelo, responda usar = false.
+- A mensagem sempre cita a escola atual pelo nome. Se a escola atual não estiver confirmada na pesquisa nem no cadastro, responda usar = false.
 - Não cite fontes nem sites ("vi no LinkedIn", "segundo o site"). Use "Vi que...".
 - Sem travessão, sem "nos conectamos", sem emoji, sem negrito, sem aspas, sem palavras como transformar, inovador, potencializar, jornada de excelência. "Rsrs" no máximo uma vez, só se couber naturalmente.
 - Uma pergunta só. No máximo 95 palavras no total. Português do Brasil, tom de conversa.
