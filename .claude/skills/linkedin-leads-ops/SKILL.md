@@ -32,7 +32,7 @@ Apps Script "Linkedin | Leads"  (apps-script/linkedin-leads/Codigo.gs)
         ▼
 WF-01E: classifica ICP → monta mensagem D+1 → register_connection (AGUARDANDO_D1, scheduled_at = D+1 útil 9h)
         │
-        ▼ seg–sex 9h, pula feriados
+        ▼ seg–qui 9h, pula feriados
 WF-02: claim_due_connections → job APPROVAL ──▶ WF-NOTIFY (a cada minuto) ──▶ Telegram: aprovação
         │                                                                     botões a:A / a:E / a:R / a:D
         ▼ toque
@@ -40,7 +40,7 @@ WF-ROUTER (único Telegram Trigger): approve_message → present_message_for_del
         ──▶ WF-NOTIFY (disparo imediato) ──▶ Telegram: só o texto + "Abrir perfil" + a:S / a:B
         ▼ Anderson cola no LinkedIn e toca "Marcar como enviada" (a:S)
 mark_message_sent → FOLLOWUP_PENDENTE + follow-up em +3 dias
-        ▼ seg–sex 9h, pula feriados
+        ▼ seg–qui 9h, pula feriados
 WF-05: claim_due_followups (botão vale 7 dias) → Telegram "X respondeu?" f:R / f:N ──▶ WF-ROUTER → complete_followup
 ```
 
@@ -51,10 +51,12 @@ Instância n8n: `rufino-linkedin-dev-n8n.snfrzv.easypanel.host`, projeto `Ml3QRA
 | Workflow | ID | Gatilho | Responsabilidade |
 |---|---|---|---|
 | WF-01E Intake por E-mail | `KMD9YouA1Un7Y68H` | Webhook POST `rufino-linkedin-aceites` (Header Auth) | Valida, classifica ICP, dedup por URL, monta mensagem, `register_connection`. Trava `PROCESSAMENTO_REAL` no 1º Code node. |
-| WF-02 Scheduler D+1 | `CxLUUmLpj3mA0nfz` | Seg–sex 9h (America/Sao_Paulo) | Pula feriado; reivindica os vencidos, mais antigos primeiro. **Regra (Anderson, 21/11): o D+1 manda.** 20/dia é referência, não teto; se os aceites novos passarem de 20 com frequência, a referência sobe para 30. `p_limit` 100 (trava contra enxurrada por erro), publicado em 21/11 (versão `9baf1a46`). |
+| WF-02 Scheduler D+1 | `CxLUUmLpj3mA0nfz` | Seg–qui 9h (America/Sao_Paulo); sexta não roda (Anderson, 27/11) | Pula feriado; reivindica os vencidos, mais antigos primeiro. **Regra (Anderson, 21/11): o D+1 manda.** 20/dia é referência, não teto; se os aceites novos passarem de 20 com frequência, a referência sobe para 30. `p_limit` 100 (trava contra enxurrada por erro), publicado em 21/11 (versão `9baf1a46`). |
 | WF-NOTIFY Outbox | `xmshrOsfUkWSBfnG` | A cada minuto + "Disparo Imediato" | `claim_notification_jobs` → envia aprovação/entrega → `confirm_notification_delivery`. |
 | WF-ROUTER | `Gjc9slZAO5lcS5RM` | **Único** Telegram Trigger (callback_query) | Valida remetente (chat 5550833898) e roteia `a:*` e `f:*`. |
-| WF-05 Follow-up | `W36Y8pew9wwaCb6d` | Seg–sex 9h | Pula feriado; `claim_due_followups` → lembrete com nome e botões. Sem trigger de Telegram. |
+| WF-05 Follow-up | `W36Y8pew9wwaCb6d` | Seg–qui 9h | Pula feriado; `claim_due_followups` → lembrete com nome e botões. Sem trigger de Telegram. |
+| WF-06 Mensagem Personalizada | `djZXn0euadA5Zg8h` | Seg–qui 8h30 | Escreve a D+1 com a pesquisa pública (Claude) antes do cartão das 9h; exige citar a escola. |
+| WF-07 Balanço Semanal | `8lU1vWFLCFnW8zGp` | Segunda 8h | Balanço da semana anterior no Telegram (aceites, enviadas, respostas por tipo e perfil, pendências). Só leitura. |
 | 99 - TEMP Manual SQL | `T29l4aosjdj26HZF` | Manual | Utilitário para SQL pontual autorizado (inativo). |
 
 Inativos que **não podem ser ativados** (têm Telegram Trigger próprio e roubariam o webhook do roteador):
@@ -82,7 +84,7 @@ NOVO → AGUARDANDO_D1 → AGUARDANDO_APROVACAO → APROVADO → PRONTO_PARA_ENV
                                                                                            └→ SEM_RESPOSTA → FOLLOWUP_PENDENTE (+3 dias)
 ```
 
-- **D+1:** `data_conexao` + 1 dia; sábado/domingo vão para segunda; hora = `operational_config.horario_d1` (9h). Feriado não muda `scheduled_at`: o WF-02 simplesmente não roda e o contato sai no próximo dia útil.
+- **D+1:** `data_conexao` + 1 dia; sábado/domingo vão para segunda; hora = `operational_config.horario_d1` (9h). Feriado não muda `scheduled_at`: o WF-02 simplesmente não roda e o contato sai no próximo dia útil. **Sexta também não roda (Anderson, 27/11: "sexta é dia ruim para conversar")**: o que vence na sexta sai na segunda, junto com o fim de semana.
 - **Origem da data:** `linkedin_email_notificacao_aceite` = dia de chegada do e-mail (pode ser 1 dia depois do aceite, nunca antes).
 - **Follow-up:** "Marcar como enviada" agenda +3 dias a partir do toque; o lembrete sai às 9h do dia útil seguinte ao vencimento. "Sem resposta" agenda mais +3 dias; "Respondeu" encerra.
 - **Validade dos botões:** aprovação/entrega 7 dias (`action_tokens`); follow-up 7 dias (claim, migração 015). Botão vencido mostra ⚠️ e não grava nada.
@@ -112,6 +114,10 @@ NOVO → AGUARDANDO_D1 → AGUARDANDO_APROVACAO → APROVADO → PRONTO_PARA_ENV
   cartão de aprovação** (pedido do Anderson, 25/11: o cartão é só a mensagem, objetiva). Acha algo
   útil em cerca de 1 de cada 3 contatos; tempo de casa quase nunca. Confiança baixa ou homônimo = não usar. Para
   testar sem gravar, chamar com `contato_id` que não seja UUID.
+- **Resposta do contato: `/respondeu Nome`** no chat do bot (WF-ROUTER → `register_reply`, migração 017). Registra
+  na hora (encerra a cadência), sem esperar o lembrete D+5. Busca por trecho do nome, sem acento; nome exato
+  desempata; só vale para quem está em `FOLLOWUP_PENDENTE`. O balanço de segunda (WF-07) conta respostas por
+  `connection_status_history.new_status = 'RESPONDEU'`.
 - **WF-06 Mensagem Personalizada** (`djZXn0euadA5Zg8h`, publicado 26/11, dias úteis 8h30): pega quem vira cartão
   às 9h, com versão 1 do modelo e pesquisa alta/média; Claude Opus 5.5 escreve no formato aprovado
   (`n8n/wf-06/prompt-sistema.txt`), `validar.js` confere (saudação, agradecimento, exatamente 2 `?`: "Tudo bem?" e a
